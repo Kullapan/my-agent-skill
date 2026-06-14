@@ -1,17 +1,17 @@
 ---
-title: Enable GitHub CodeQL for Automated Vulnerability Discovery
+title: Enable GitHub CodeQL for Automated Code gap Discovery
 impact: HIGH
 impactDescription: CWE-1006 — OWASP A03 Injection / A01 Broken Access Control
-tags: security, sast, codeql, github, vulnerability-scanning, code-scanning, dataflow-analysis
+tags: security, sast, codeql, github, code gap-scanning, code-scanning, dataflow-analysis
 ---
 
-## Enable GitHub CodeQL for Automated Vulnerability Discovery
+## Enable GitHub CodeQL for Automated Code gap Discovery
 
 **Impact: HIGH — CWE-1006**
 
-CodeQL is GitHub's semantic code analysis engine that builds a queryable database of your code and finds vulnerabilities through **dataflow analysis** — tracking untrusted input from sources (HTTP request, env vars, user input) through your code to dangerous sinks (SQL queries, HTML output, shell commands). Unlike pattern-matching tools, CodeQL understands code semantics and catches vulnerabilities across function call chains. It is free for open-source repositories and included in GitHub Advanced Security for private repos.
+CodeQL is GitHub's semantic code analysis engine that builds a queryable database of your code and finds code gaps through **dataflow analysis** — tracking untrusted input from sources (HTTP request, env vars, user input) through your code to dangerous sinks (SQL queries, HTML output, shell commands). Unlike pattern-matching tools, CodeQL understands code semantics and catches code gaps across function call chains. It is free for open-source repositories and included in GitHub Advanced Security for private repos.
 
-**Vulnerable (code that CodeQL's dataflow analysis catches):**
+**Non-compliant (code that CodeQL's dataflow analysis catches):**
 
 ```typescript
 // ❌ CodeQL: js/sql-injection — tracks req.query.id → db.query

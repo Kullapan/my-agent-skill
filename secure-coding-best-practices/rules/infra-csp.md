@@ -9,9 +9,9 @@ tags: security, infrastructure, csp, content-security-policy, xss, injection
 
 **Impact: MEDIUM — CWE-79**
 
-A Content Security Policy is the strongest browser-side XSS mitigation. Even if an attacker injects a script, CSP prevents it from executing unless it comes from an approved source. A strict nonce-based or hash-based CSP blocks inline scripts and `eval`, eliminating most XSS impact.
+A Content Security Policy is the strongest browser-side XSS mitigation. Even if an untrusted client injects a script, CSP prevents it from executing unless it comes from an approved source. A strict nonce-based or hash-based CSP blocks inline scripts and `eval`, eliminating most XSS impact.
 
-**Vulnerable (no CSP or permissive CSP):**
+**Non-compliant (no CSP or permissive CSP):**
 
 ```typescript
 // ❌ No CSP header at all — any injected script executes

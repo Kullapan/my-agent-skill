@@ -9,9 +9,9 @@ tags: security, api, https, hsts, tls, transport-security, http-redirect
 
 **Impact: HIGH — CWE-319**
 
-Plaintext HTTP exposes all traffic — credentials, session tokens, and data — to network-level interception (MITM attacks). HSTS tells browsers to only connect via HTTPS, preventing downgrade attacks even when a user types `http://`. Redirect all HTTP traffic to HTTPS server-side.
+Plaintext HTTP exposes all traffic — credentials, session tokens, and data — to network-level interception (MITM risks). HSTS tells browsers to only connect via HTTPS, preventing downgrade risks even when a user types `http://`. Redirect all HTTP traffic to HTTPS server-side.
 
-**Vulnerable (HTTP allowed, no HSTS):**
+**Non-compliant (HTTP allowed, no HSTS):**
 
 ```typescript
 // ❌ No redirect from HTTP to HTTPS

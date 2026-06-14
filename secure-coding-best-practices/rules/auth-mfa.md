@@ -9,9 +9,9 @@ tags: security, authentication, mfa, totp, 2fa, privileged-access
 
 **Impact: HIGH — CWE-308**
 
-Multi-factor authentication (MFA) dramatically reduces the risk of account takeover even when passwords are compromised. MFA should be mandatory for admin roles and strongly encouraged for all users. Step-up authentication (requiring MFA for specific high-risk actions) protects sensitive operations without constant friction.
+Multi-factor authentication (MFA) dramatically reduces the risk of account takeover even when passwords are unauthorized accessd. MFA should be mandatory for admin roles and strongly encouraged for all users. Step-up authentication (requiring MFA for specific high-risk actions) protects sensitive operations without constant friction.
 
-**Vulnerable (password-only auth for admin actions):**
+**Non-compliant (password-only auth for admin actions):**
 
 ```typescript
 // ❌ Admin action gated only by JWT role — no second factor
@@ -76,6 +76,6 @@ app.post('/api/admin/users/:id/delete',
 )
 ```
 
-Use TOTP (RFC 6238) as the primary second factor. Provide backup codes. Consider hardware keys (FIDO2/WebAuthn) for admin accounts. Never allow MFA bypass via SMS for high-security contexts (SIM-swap attacks).
+Use TOTP (RFC 6238) as the primary second factor. Provide backup codes. Consider hardware keys (FIDO2/WebAuthn) for admin accounts. Never allow MFA bypass via SMS for high-security contexts (SIM-swap risks).
 
 Reference: [OWASP Multifactor Authentication Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Multifactor_Authentication_Cheat_Sheet.html)

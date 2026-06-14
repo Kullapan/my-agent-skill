@@ -9,14 +9,14 @@ tags: security, injection, command-injection, shell, exec, spawn
 
 **Impact: CRITICAL — CWE-78**
 
-OS command injection lets attackers execute arbitrary commands on the server with the application's privileges. Any use of `exec`, `execSync`, or shell-interpolating functions with user-controlled data is exploitable. Use `spawn` with an argument array instead, which never invokes a shell.
+OS command injection lets untrusted clients execute arbitrary commands on the server with the application's privileges. Any use of `exec`, `execSync`, or shell-interpolating functions with user-controlled data is non-compliant. Use `spawn` with an argument array instead, which never invokes a shell.
 
-**Vulnerable (shell command injection):**
+**Non-compliant (shell command injection):**
 
 ```typescript
 import { exec, execSync } from 'child_process'
 
-// ❌ Attacker sends: filename='; rm -rf /; echo '
+// ❌ Untrusted client sends: filename='; rm -rf /; echo '
 exec(`convert /uploads/${req.body.filename} output.jpg`, callback)
 
 // ❌ execSync with template literal
@@ -67,4 +67,4 @@ function ping(host: string) {
 
 If you need shell features (pipes, redirects), use them in static scripts and pass only validated data as arguments. Never allow user input to reach the shell command string itself.
 
-Reference: [OWASP Command Injection](https://owasp.org/www-community/attacks/Command_Injection)
+Reference: [OWASP Command Injection](https://owasp.org/www-community/risks/Command_Injection)

@@ -11,7 +11,7 @@ tags: security, api, idempotency, design, duplicate-processing, race-condition
 
 Without idempotency protection, network retries, client bugs, or user double-clicks can cause duplicate payments, double order submissions, or repeated side effects. An idempotency key is a client-generated unique identifier sent with each request — the server processes the request once and returns the cached response for subsequent calls with the same key. This prevents financial loss, data corruption, and user frustration.
 
-**Vulnerable (no idempotency — duplicate processing):**
+**Non-compliant (no idempotency — duplicate processing):**
 
 ```typescript
 // ❌ No idempotency — retried requests charge the customer twice

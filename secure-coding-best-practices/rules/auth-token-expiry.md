@@ -9,12 +9,12 @@ tags: security, authentication, tokens, jwt, refresh-tokens, expiry
 
 **Impact: CRITICAL — CWE-613**
 
-Long-lived access tokens give attackers a large window to exploit a stolen token. Access tokens should expire in minutes (15 min max). Refresh tokens should be single-use with rotation — when a refresh token is used, issue a new one and invalidate the old. This limits blast radius and detects token theft (reuse of a rotated token signals compromise).
+Long-lived access tokens give untrusted clients a large window to abuse a stolen token. Access tokens should expire in minutes (15 min max). Refresh tokens should be single-use with rotation — when a refresh token is used, issue a new one and invalidate the old. This limits impact area and detects token theft (reuse of a rotated token signals unauthorized access).
 
-**Vulnerable (long-lived non-rotating tokens):**
+**Non-compliant (long-lived non-rotating tokens):**
 
 ```typescript
-// ❌ Token valid for 30 days — stolen token compromises account for weeks
+// ❌ Token valid for 30 days — stolen token unauthorized accesss account for weeks
 const token = jwt.sign({ userId: user.id }, JWT_SECRET, {
   expiresIn: '30d',
 })
@@ -69,6 +69,6 @@ app.post('/auth/refresh', async (req, res) => {
 })
 ```
 
-Store refresh tokens server-side (not in JWTs). Detect reuse of rotated tokens as a signal of compromise and revoke all sessions for the user.
+Store refresh tokens server-side (not in JWTs). Detect reuse of rotated tokens as a signal of unauthorized access and revoke all sessions for the user.
 
 Reference: [OWASP Session Management Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html)

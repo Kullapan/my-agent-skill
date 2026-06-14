@@ -11,7 +11,7 @@ tags: security, secrets, vault, aws-secrets-manager, doppler, environment
 
 Plain `.env` files with production secrets on developer machines or CI runners are a major breach vector. Secrets managers (AWS Secrets Manager, HashiCorp Vault, Doppler) provide centralized storage, access control, audit logs, and automatic rotation. Secrets are injected at runtime — never stored on disk in plaintext.
 
-**Vulnerable (plain .env with production secrets on disk):**
+**Non-compliant (plain .env with production secrets on disk):**
 
 ```bash
 # ❌ .env.production stored in repo or on developer laptop
@@ -22,7 +22,7 @@ AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
 ```
 
 ```typescript
-// ❌ Loaded from disk — file is a single point of compromise
+// ❌ Loaded from disk — file is a single point of unauthorized access
 import 'dotenv/config'
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!)
 ```

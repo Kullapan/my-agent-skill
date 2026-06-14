@@ -9,12 +9,12 @@ tags: security, path-traversal, file-system, directory-traversal, input-validati
 
 **Impact: CRITICAL — CWE-22**
 
-Path traversal attacks use `../` sequences in filenames to escape the intended directory and read arbitrary files (`/etc/passwd`, `.env`, private keys). Never construct file paths from user input without resolving and verifying they remain within the expected directory.
+Path traversal risks use `../` sequences in filenames to escape the intended directory and read arbitrary files (`/etc/passwd`, `.env`, private keys). Never construct file paths from user input without resolving and verifying they remain within the expected directory.
 
-**Vulnerable (unsanitized path from user input):**
+**Non-compliant (unsanitized path from user input):**
 
 ```typescript
-// ❌ Attacker sends: filename=../../.env
+// ❌ Untrusted client sends: filename=../../.env
 app.get('/files/:filename', (req, res) => {
   const filePath = path.join('/uploads', req.params.filename)
   res.sendFile(filePath)
@@ -64,4 +64,4 @@ app.get('/files/:fileId', requireAuth, async (req, res) => {
 
 Prefer the allowlist approach: store files with server-generated names (UUIDs) and look up the real path from the database. This eliminates the need for path validation entirely.
 
-Reference: [OWASP Path Traversal](https://owasp.org/www-community/attacks/Path_Traversal)
+Reference: [OWASP Path Traversal](https://owasp.org/www-community/risks/Path_Traversal)

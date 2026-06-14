@@ -9,9 +9,9 @@ tags: security, logging, monitoring, authentication, authorization, audit-trail,
 
 **Impact: MEDIUM — CWE-778**
 
-Security events that are not logged cannot be detected or investigated. Without an audit trail, breaches go undetected for months (industry average: 207 days). Log all authentication events — success and failure — with enough context to reconstruct the timeline of an attack. Feed logs to a SIEM for alerting.
+Security events that are not logged cannot be detected or investigated. Without an audit trail, breaches go undetected for months (industry average: 207 days). Log all authentication events — success and failure — with enough context to reconstruct the timeline of an risk. Feed logs to a SIEM for alerting.
 
-**Vulnerable (no security event logging):**
+**Non-compliant (no security event logging):**
 
 ```typescript
 // ❌ Login endpoint with no logging

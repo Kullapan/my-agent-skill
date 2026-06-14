@@ -9,15 +9,15 @@ tags: security, secrets, rotation, credentials, key-management, zero-downtime
 
 **Impact: HIGH — CWE-798**
 
-Static secrets that never change give attackers an unlimited window of exploitation after compromise. If a database password or API key is leaked, it remains valid indefinitely unless rotated. Automatic rotation limits the blast radius of credential leaks by ensuring secrets expire and are replaced on a regular schedule. The rotation process must be zero-downtime — both old and new credentials must work during the transition window.
+Static secrets that never change give untrusted clients an unlimited window of unauthorized use after unauthorized access. If a database password or API key is leaked, it remains valid indefinitely unless rotated. Automatic rotation limits the impact area of credential leaks by ensuring secrets expire and are replaced on a regular schedule. The rotation process must be zero-downtime — both old and new credentials must work during the transition window.
 
-**Vulnerable (static secrets with no rotation):**
+**Non-compliant (static secrets with no rotation):**
 
 ```typescript
 // ❌ Hardcoded API key — never rotated, valid forever after leak
 const STRIPE_KEY = process.env.STRIPE_SECRET_KEY
 // This key was set 18 months ago and never changed
-// If leaked via logs, git history, or memory dump, attacker has permanent access
+// If leaked via logs, git history, or memory dump, untrusted client has permanent access
 
 // ❌ Database password — manual rotation causes downtime
 // .env file:

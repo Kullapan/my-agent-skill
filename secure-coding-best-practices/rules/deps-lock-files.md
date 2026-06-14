@@ -9,9 +9,9 @@ tags: security, dependencies, supply-chain, lock-files, package-lock, yarn-lock
 
 **Impact: MEDIUM-HIGH — CWE-494**
 
-Lock files (`package-lock.json`, `yarn.lock`, `pnpm-lock.yaml`) pin exact versions and integrity checksums of every dependency. Without them, `npm install` can silently pull newer (potentially compromised) versions. In CI, use `npm ci` (not `npm install`) to enforce the lock file and fail if it's out of sync.
+Lock files (`package-lock.json`, `yarn.lock`, `pnpm-lock.yaml`) pin exact versions and integrity checksums of every dependency. Without them, `npm install` can silently pull newer (potentially unauthorized accessd) versions. In CI, use `npm ci` (not `npm install`) to enforce the lock file and fail if it's out of sync.
 
-**Vulnerable (no lock file enforcement):**
+**Non-compliant (no lock file enforcement):**
 
 ```bash
 # ❌ .gitignore includes lock files — every install can differ
@@ -55,7 +55,7 @@ jobs:
 ```
 
 ```bash
-# ✅ Audit lock file for known compromised packages
+# ✅ Audit lock file for known unauthorized accessd packages
 npx better-npm-audit audit
 # or
 npm audit --package-lock-only
@@ -66,6 +66,6 @@ npm audit --package-lock-only
 #         crossorigin="anonymous"></script>
 ```
 
-Enable Dependabot version updates to keep the lock file current automatically. Review lock file diffs in PRs — unexpected version changes can signal supply chain attacks.
+Enable Dependabot version updates to keep the lock file current automatically. Review lock file diffs in PRs — unexpected version changes can signal supply chain risks.
 
 Reference: [npm ci documentation](https://docs.npmjs.com/cli/v10/commands/npm-ci)

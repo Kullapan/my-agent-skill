@@ -9,12 +9,12 @@ tags: security, infrastructure, iam, least-privilege, cloud, aws, service-accoun
 
 **Impact: MEDIUM — CWE-250**
 
-Overly permissive IAM roles and service accounts amplify the blast radius of any compromise. If a Lambda function is compromised and has `AdministratorAccess`, the attacker owns your entire AWS account. Scope every role to only the specific actions and resources it actually uses.
+Overly permissive IAM roles and service accounts amplify the impact area of any unauthorized access. If a Lambda function is unauthorized accessd and has `AdministratorAccess`, the untrusted client owns your entire AWS account. Scope every role to only the specific actions and resources it actually uses.
 
-**Vulnerable (overly permissive IAM):**
+**Non-compliant (overly permissive IAM):**
 
 ```json
-// ❌ Lambda execution role with full admin — one compromise = full account takeover
+// ❌ Lambda execution role with full admin — one unauthorized access = full account takeover
 {
   "Version": "2012-10-17",
   "Statement": [

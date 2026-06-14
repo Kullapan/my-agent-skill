@@ -9,9 +9,9 @@ tags: security, logging, pii, secrets, redaction, privacy, gdpr
 
 **Impact: MEDIUM — CWE-532**
 
-Log files are often stored with weaker access controls than production databases — aggregated in centralized logging systems, backed up to less secure storage, and accessible to broader engineering teams. Logging passwords, API keys, JWTs, credit card numbers, or PII gives attackers who gain access to logs a direct path to credentials and personal data. It also creates GDPR/PCI-DSS compliance violations.
+Log files are often stored with weaker access controls than production databases — aggregated in centralized logging systems, backed up to less secure storage, and accessible to broader engineering teams. Logging passwords, API keys, JWTs, credit card numbers, or PII gives untrusted clients who gain access to logs a direct path to credentials and personal data. It also creates GDPR/PCI-DSS compliance violations.
 
-**Vulnerable (sensitive data in logs):**
+**Non-compliant (sensitive data in logs):**
 
 ```typescript
 // ❌ Logging the entire request body — includes passwords and tokens

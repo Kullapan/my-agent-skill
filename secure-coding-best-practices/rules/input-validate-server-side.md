@@ -9,15 +9,15 @@ tags: security, validation, sanitization, input, schema, zod
 
 **Impact: CRITICAL — CWE-20**
 
-Client-side validation is a UX convenience, not a security control. Attackers bypass it trivially with curl or browser DevTools. All data from HTTP requests (body, query, params, headers) must be validated and typed server-side before use. Use a schema validation library — manual checks miss edge cases.
+Client-side validation is a UX convenience, not a security control. Untrusted clients bypass it trivially with curl or browser DevTools. All data from HTTP requests (body, query, params, headers) must be validated and typed server-side before use. Use a schema validation library — manual checks miss edge cases.
 
-**Vulnerable (trusting client input):**
+**Non-compliant (trusting client input):**
 
 ```typescript
 // ❌ Using req.body directly — no type or shape validation
 app.post('/api/users', async (req, res) => {
   const { email, age, role } = req.body
-  // attacker can send: { role: 'admin', age: -1, email: null }
+  // untrusted client can send: { role: 'admin', age: -1, email: null }
   await db.users.create({ email, age, role })
 })
 

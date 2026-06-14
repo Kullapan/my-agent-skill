@@ -9,16 +9,16 @@ tags: security, authentication, jwt, tokens, signature, algorithm
 
 **Impact: CRITICAL — CWE-347**
 
-JWTs must be validated on every request: verify the signature, reject the `none` algorithm, enforce `alg` allowlist, and check `exp`, `iss`, and `aud` claims. Skipping any step allows attackers to forge tokens, elevate privileges, or reuse expired tokens.
+JWTs must be validated on every request: verify the signature, reject the `none` algorithm, enforce `alg` allowlist, and check `exp`, `iss`, and `aud` claims. Skipping any step allows untrusted clients to forge tokens, elevate privileges, or reuse expired tokens.
 
-**Vulnerable (incomplete validation):**
+**Non-compliant (incomplete validation):**
 
 ```typescript
 // ❌ Only decodes — does NOT verify signature
 import jwt from 'jsonwebtoken'
 const payload = jwt.decode(token) // trusts token blindly
 
-// ❌ Accepts 'none' algorithm — attacker can forge any payload
+// ❌ Accepts 'none' algorithm — untrusted client can forge any payload
 const payload = jwt.verify(token, secret) // if alg not locked down
 
 // ❌ No expiry, issuer, or audience check

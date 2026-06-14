@@ -11,7 +11,7 @@ tags: security, error-handling, resource-cleanup, connection-leak, file-handle, 
 
 Resources like database connections, file handles, network sockets, and encryption contexts must be released even when exceptions occur. Leaked resources exhaust connection pools, fill file descriptor tables, and eventually crash the application. In high-traffic systems, a single missing `finally` block can cause a denial-of-service condition within hours as the connection pool drains to zero.
 
-**Vulnerable (resources leaked on exception):**
+**Non-compliant (resources leaked on exception):**
 
 ```typescript
 // ❌ Database connection leaked if query throws

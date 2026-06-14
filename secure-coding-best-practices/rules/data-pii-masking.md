@@ -11,7 +11,7 @@ tags: security, data-protection, pii, logging, masking, gdpr, privacy
 
 Logs are frequently shared with third parties (Datadog, Splunk, Sentry), stored insecurely, or accessed by developers who should not see production PII. Logging full email addresses, SSNs, card numbers, or tokens creates privacy and compliance violations (GDPR, HIPAA, PCI-DSS). Mask or redact before any log output.
 
-**Vulnerable (PII in logs):**
+**Non-compliant (PII in logs):**
 
 ```typescript
 // ❌ Full PII logged

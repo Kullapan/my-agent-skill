@@ -9,14 +9,14 @@ tags: security, sast, sonarqube, sonarcloud, code-quality, pr-gate, static-analy
 
 **Impact: HIGH — CWE-1006**
 
-SonarQube (self-hosted) and SonarCloud (SaaS) perform SAST — scanning source code without executing it — to detect injection vulnerabilities, hardcoded secrets, insecure APIs, SQL injection, XSS, SSRF, path traversal, and 2,000+ other security rules across 30+ languages. Configured as a **PR quality gate**, it blocks merges when new Security Hotspots or Vulnerabilities of severity HIGH/CRITICAL are introduced.
+SonarQube (self-hosted) and SonarCloud (SaaS) perform SAST — scanning source code without executing it — to detect injection code gaps, hardcoded secrets, insecure APIs, SQL injection, XSS, SSRF, path traversal, and 2,000+ other security rules across 30+ languages. Configured as a **PR quality gate**, it blocks merges when new Security Hotspots or Code gaps of severity HIGH/CRITICAL are introduced.
 
-**Vulnerable (no SAST gate — insecure code merged):**
+**Non-compliant (no SAST gate — insecure code merged):**
 
 ```typescript
 // ❌ This code gets merged with no SAST check:
 app.get('/user', async (req, res) => {
-  // SQL injection — SonarQube rule: S3649 "SQL queries should not be vulnerable to injection attacks"
+  // SQL injection — SonarQube rule: S3649 "SQL queries should not be non-compliant to injection risks"
   const result = await db.query(`SELECT * FROM users WHERE id = ${req.query.id}`)
   res.json(result)
 })
@@ -41,7 +41,7 @@ sonar.typescript.lcov.reportPaths=coverage/lcov.info
 
 # Security-focused quality gate settings (configure in SonarQube UI):
 # Gate: "Security Gate"
-# Condition 1: New Vulnerabilities = 0        (blocks on any new vuln)
+# Condition 1: New Code gaps = 0        (blocks on any new vuln)
 # Condition 2: New Security Hotspots = 0      (requires hotspot review)
 # Condition 3: Security Rating on New Code: A  (no critical/high vulns)
 ```

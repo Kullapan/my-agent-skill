@@ -11,7 +11,7 @@ tags: security, data-protection, privacy, gdpr, data-minimization, pii
 
 Every piece of PII you collect is a liability. Data breaches expose what you store. GDPR Article 5 and CCPA require collecting only data that is adequate, relevant, and limited to what is necessary. Unused data fields increase your breach impact, compliance scope, and regulatory risk.
 
-**Vulnerable (over-collection):**
+**Non-compliant (over-collection):**
 
 ```typescript
 // ❌ Collecting far more than needed for a newsletter signup

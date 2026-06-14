@@ -9,9 +9,9 @@ tags: security, authentication, passwords, hashing, bcrypt, argon2
 
 **Impact: CRITICAL — CWE-916**
 
-Passwords must never be stored in plaintext or with fast hash functions (MD5, SHA-1, SHA-256). Fast hashes allow attackers to crack millions of passwords per second with GPU hardware after a database breach. bcrypt, Argon2id, or scrypt are intentionally slow and memory-hard, making brute-force infeasible.
+Passwords must never be stored in plaintext or with fast hash functions (MD5, SHA-1, SHA-256). Fast hashes allow untrusted clients to crack millions of passwords per second with GPU hardware after a database breach. bcrypt, Argon2id, or scrypt are intentionally slow and memory-hard, making brute-force infeasible.
 
-**Vulnerable (plaintext or weak hash):**
+**Non-compliant (plaintext or weak hash):**
 
 ```typescript
 // ❌ Storing plaintext password

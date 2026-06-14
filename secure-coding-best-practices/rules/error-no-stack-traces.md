@@ -9,9 +9,9 @@ tags: security, error-handling, stack-traces, information-disclosure, production
 
 **Impact: MEDIUM — CWE-209**
 
-Stack traces reveal file paths, framework versions, library names, database schemas, and internal logic — a reconnaissance goldmine for attackers. In production, return only a generic error message to clients; log the full details server-side with a correlation ID so engineers can debug.
+Stack traces reveal file paths, framework versions, library names, database schemas, and internal logic — a reconnaissance goldmine for untrusted clients. In production, return only a generic error message to clients; log the full details server-side with a correlation ID so engineers can debug.
 
-**Vulnerable (exposing internals):**
+**Non-compliant (exposing internals):**
 
 ```typescript
 // ❌ Default Express error handler — sends full stack to client

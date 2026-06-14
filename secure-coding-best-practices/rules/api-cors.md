@@ -9,9 +9,9 @@ tags: security, api, cors, cross-origin, headers, access-control
 
 **Impact: HIGH — CWE-346**
 
-Misconfigured CORS allows malicious websites to make authenticated cross-origin requests to your API on behalf of users (reading data, triggering actions). A wildcard `Access-Control-Allow-Origin: *` with `credentials: true` is a critical misconfiguration — browsers block it, but some setups inadvertently reflect the request origin, which has the same effect.
+Misconfigured CORS allows untrusted websites to make authenticated cross-origin requests to your API on behalf of users (reading data, triggering actions). A wildcard `Access-Control-Allow-Origin: *` with `credentials: true` is a critical misconfiguration — browsers block it, but some setups inadvertently reflect the request origin, which has the same effect.
 
-**Vulnerable (wildcard or reflected origin):**
+**Non-compliant (wildcard or reflected origin):**
 
 ```typescript
 // ❌ Wildcard — any website can call your API cross-origin
@@ -28,7 +28,7 @@ app.use((req, res, next) => {
   next()
 })
 
-// ❌ Weak origin validation — attacker uses evil.myapp.com
+// ❌ Weak origin validation — untrusted client uses evil.myapp.com
 const origin = req.headers.origin
 if (origin.includes('myapp.com')) {  // substring match is bypassable
   res.header('Access-Control-Allow-Origin', origin)

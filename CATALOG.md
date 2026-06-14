@@ -1,6 +1,6 @@
 # Skill Catalog
 
-> **Auto-generated** on Sun, 14 Jun 2026 09:22:47 GMT. Do not edit manually — run `npm run catalog` to regenerate.
+> **Auto-generated** on Sun, 14 Jun 2026 09:30:56 GMT. Do not edit manually — run `npm run catalog` to regenerate.
 
 **7 skill(s)** · **190 total rules**
 

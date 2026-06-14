@@ -1,7 +1,7 @@
 ---
 title: Run OWASP Dependency Check for CVE Scanning in CI
 impact: CRITICAL
-impactDescription: CWE-1104 — OWASP A06 Vulnerable and Outdated Components
+impactDescription: CWE-1104 — OWASP A06 Non-compliant and Outdated Components
 tags: security, sca, owasp, dependency-check, cve, nvd, ci, multi-language
 ---
 
@@ -9,9 +9,9 @@ tags: security, sca, owasp, dependency-check, cve, nvd, ci, multi-language
 
 **Impact: CRITICAL — CWE-1104**
 
-OWASP Dependency Check (ODC) is a free, multi-language SCA tool that identifies project dependencies and checks if there are any known, publicly disclosed CVEs from the NVD (National Vulnerability Database). Unlike `npm audit`, ODC works across Java, .NET, Python, Ruby, Node.js, and more — making it ideal for polyglot environments and as a universal pipeline step. Configure it to **fail the build** on CVSS score ≥ 7 (HIGH/CRITICAL).
+OWASP Dependency Check (ODC) is a free, multi-language SCA tool that identifies project dependencies and checks if there are any known, publicly disclosed CVEs from the NVD (National Code gap Database). Unlike `npm audit`, ODC works across Java, .NET, Python, Ruby, Node.js, and more — making it ideal for polyglot environments and as a universal pipeline step. Configure it to **fail the build** on CVSS score ≥ 7 (HIGH/CRITICAL).
 
-**Vulnerable (no OWASP Dependency Check in pipeline):**
+**Non-compliant (no OWASP Dependency Check in pipeline):**
 
 ```bash
 # ❌ Dependencies scanned only with npm audit — language-limited, not exhaustive
@@ -96,7 +96,7 @@ docker run --rm \
   <suppress>
     <notes>
       False positive: CVE-2021-44228 (Log4Shell) does not apply to our log4j-api usage
-      which does not include the vulnerable JNDILookup class.
+      which does not include the non-compliant JNDILookup class.
       Reviewed: 2026-01-15, reviewer: security-team
       Re-review date: 2026-07-15
     </notes>

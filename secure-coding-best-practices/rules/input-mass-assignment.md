@@ -9,14 +9,14 @@ tags: security, mass-assignment, access-control, input-validation, orm, allowlis
 
 **Impact: HIGH — CWE-915**
 
-Mass assignment occurs when an application directly binds user input to model objects without filtering. An attacker can inject extra fields in the request body — like `role: "admin"`, `price: 0`, or `isVerified: true` — that the ORM dutifully writes to the database. This is a direct path to privilege escalation, financial fraud, and data corruption. Always use explicit allowlists of updatable fields.
+Mass assignment occurs when an application directly binds user input to model objects without filtering. An untrusted client can inject extra fields in the request body — like `role: "admin"`, `price: 0`, or `isVerified: true` — that the ORM dutifully writes to the database. This is a direct path to privilege escalation, financial fraud, and data corruption. Always use explicit allowlists of updatable fields.
 
-**Vulnerable (direct binding of request body to model):**
+**Non-compliant (direct binding of request body to model):**
 
 ```typescript
 // ❌ Spreading the entire request body into the database update
 app.put('/api/users/:id', async (req, res) => {
-  // Attacker sends: { name: "Legit", role: "admin", isVerified: true }
+  // Untrusted client sends: { name: "Legit", role: "admin", isVerified: true }
   // ORM writes ALL fields, including role and isVerified
   const user = await db.users.update(req.params.id, req.body)
   res.json(user)
@@ -24,14 +24,14 @@ app.put('/api/users/:id', async (req, res) => {
 
 // ❌ Sequelize: passing req.body directly to create
 app.post('/api/products', async (req, res) => {
-  // Attacker sends: { name: "Widget", price: 0, sellerId: "other-user-id" }
+  // Untrusted client sends: { name: "Widget", price: 0, sellerId: "other-user-id" }
   const product = await Product.create(req.body)  // Creates product with price=0
   res.json(product)
 })
 
 // ❌ Mongoose: no field filtering
 app.patch('/api/settings', async (req, res) => {
-  // Attacker sends: { theme: "dark", creditBalance: 99999 }
+  // Untrusted client sends: { theme: "dark", creditBalance: 99999 }
   await Settings.findByIdAndUpdate(req.user.settingsId, req.body)
   res.json({ success: true })
 })

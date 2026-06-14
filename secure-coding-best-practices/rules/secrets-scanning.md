@@ -11,7 +11,7 @@ tags: security, secrets, scanning, ci, git, pre-commit, trufflehog
 
 Secrets committed to git are often discovered within minutes by automated scanners (GitHub Secret Scanning, bots). Pre-commit hooks catch secrets before they ever hit the remote. CI scanning provides a second safety net. Both layers are required.
 
-**Vulnerable (no secret scanning in place):**
+**Non-compliant (no secret scanning in place):**
 
 ```bash
 # ❌ No pre-commit hook — secret committed without warning

@@ -9,16 +9,16 @@ tags: security, deserialization, injection, rce, input-validation, prototype-pol
 
 **Impact: CRITICAL — CWE-502**
 
-Unsafe deserialization converts attacker-controlled bytes or strings into live objects, potentially executing arbitrary code, escalating privileges, or corrupting application state. In JavaScript/Node.js, this manifests as prototype pollution via `JSON.parse` of unvalidated input, `eval`-based deserializers, or libraries like `node-serialize` that execute functions during deserialization. In Java, `ObjectInputStream` on untrusted data has caused some of the most severe RCE vulnerabilities in history.
+Unsafe deserialization converts untrusted client-controlled bytes or strings into live objects, potentially executing arbitrary code, escalating privileges, or corrupting application state. In JavaScript/Node.js, this manifests as prototype pollution via `JSON.parse` of unvalidated input, `eval`-based deserializers, or libraries like `node-serialize` that execute functions during deserialization. In Java, `ObjectInputStream` on untrusted data has caused some of the most severe RCE code gaps in history.
 
-**Vulnerable (unsafe deserialization):**
+**Non-compliant (unsafe deserialization):**
 
 ```typescript
 // ❌ node-serialize executes functions embedded in serialized data
 import { unserialize } from 'node-serialize'
 
 app.post('/api/session', (req, res) => {
-  // Attacker sends: {"rce":"_$$ND_FUNC$$_function(){require('child_process').exec('rm -rf /')}()"}
+  // Untrusted client sends: {"rce":"_$$ND_FUNC$$_function(){require('child_process').exec('rm -rf /')}()"}
   const session = unserialize(req.body.data)
   res.json(session)
 })

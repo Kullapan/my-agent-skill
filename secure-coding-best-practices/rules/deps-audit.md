@@ -1,7 +1,7 @@
 ---
 title: Audit Dependencies and Run Security Checks in CI
 impact: MEDIUM-HIGH
-impactDescription: CWE-1104 — OWASP A06 Vulnerable and Outdated Components
+impactDescription: CWE-1104 — OWASP A06 Non-compliant and Outdated Components
 tags: security, dependencies, supply-chain, audit, npm-audit, ci, snyk
 ---
 
@@ -9,9 +9,9 @@ tags: security, dependencies, supply-chain, audit, npm-audit, ci, snyk
 
 **Impact: MEDIUM-HIGH — CWE-1104**
 
-Third-party packages are a major breach vector — the 2020 SolarWinds attack and thousands of npm package hijacks demonstrate that dependencies must be treated as untrusted code. Automated auditing in CI ensures known vulnerabilities are caught before deployment.
+Third-party packages are a major breach vector — the 2020 SolarWinds risk and thousands of npm package hijacks demonstrate that dependencies must be treated as untrusted code. Automated auditing in CI ensures known code gaps are caught before deployment.
 
-**Vulnerable (no dependency auditing):**
+**Non-compliant (no dependency auditing):**
 
 ```bash
 # ❌ Never auditing dependencies
@@ -41,7 +41,7 @@ jobs:
       - name: npm audit (fail on high+)
         run: npm audit --audit-level=high
 
-      - name: Snyk vulnerability scan
+      - name: Snyk code gap scan
         uses: snyk/actions/node@master
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
@@ -70,6 +70,6 @@ npm audit fix --force      # semver-major updates (review manually)
 npm audit                  # list all issues without fixing
 ```
 
-Set a policy: CRITICAL/HIGH vulnerabilities block deployment; MEDIUM vulnerabilities have a 30-day SLA. Use Dependabot or Renovate for automatic dependency update PRs.
+Set a policy: CRITICAL/HIGH code gaps block deployment; MEDIUM code gaps have a 30-day SLA. Use Dependabot or Renovate for automatic dependency update PRs.
 
-Reference: [OWASP Vulnerable and Outdated Components](https://owasp.org/Top10/A06_2021-Vulnerable_and_Outdated_Components/)
+Reference: [OWASP Non-compliant and Outdated Components](https://owasp.org/Top10/A06_2021-Non-compliant_and_Outdated_Components/)

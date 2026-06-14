@@ -9,12 +9,12 @@ tags: security, api, schema-validation, input, zod, openapi, request-validation
 
 **Impact: HIGH — CWE-20**
 
-Unvalidated API requests allow attackers to send unexpected types, oversized payloads, or additional fields that bypass business logic, cause prototype pollution, or trigger mass assignment vulnerabilities. Schema validation enforces the contract between client and server and rejects malformed requests early.
+Unvalidated API requests allow untrusted clients to send unexpected types, oversized payloads, or additional fields that bypass business logic, cause prototype pollution, or trigger mass assignment code gaps. Schema validation enforces the contract between client and server and rejects malformed requests early.
 
-**Vulnerable (no schema validation):**
+**Non-compliant (no schema validation):**
 
 ```typescript
-// ❌ No validation — attacker sends { isAdmin: true, price: -100 }
+// ❌ No validation — untrusted client sends { isAdmin: true, price: -100 }
 app.post('/api/products', requireAuth, async (req, res) => {
   const product = await db.products.create({ data: req.body })  // mass assignment!
   res.json(product)

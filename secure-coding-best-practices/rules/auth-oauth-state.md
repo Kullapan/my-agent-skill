@@ -9,12 +9,12 @@ tags: security, authentication, oauth, oidc, pkce, csrf, redirect
 
 **Impact: CRITICAL — CWE-352 / CWE-601**
 
-OAuth flows without `state` parameter are vulnerable to CSRF attacks that can link an attacker's account to a victim's session. Without PKCE (Proof Key for Code Exchange), authorization codes can be intercepted and exchanged by a malicious app. Both mitigations are required for public clients and SPAs.
+OAuth flows without `state` parameter are non-compliant to CSRF risks that can link an untrusted client's account to a victim's session. Without PKCE (Proof Key for Code Exchange), authorization codes can be intercepted and exchanged by a untrusted app. Both mitigations are required for public clients and SPAs.
 
-**Vulnerable (no state, no PKCE):**
+**Non-compliant (no state, no PKCE):**
 
 ```typescript
-// ❌ No state parameter — CSRF attack can link attacker account to victim
+// ❌ No state parameter — CSRF risk can link untrusted client account to victim
 const authUrl = `https://provider.com/oauth/authorize
   ?client_id=${CLIENT_ID}
   &redirect_uri=${REDIRECT_URI}

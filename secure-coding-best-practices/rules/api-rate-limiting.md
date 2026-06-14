@@ -9,19 +9,19 @@ tags: security, api, rate-limiting, throttling, brute-force, dos
 
 **Impact: HIGH — CWE-770**
 
-Without rate limiting, attackers can brute-force passwords, enumerate accounts, scrape data, or overwhelm your service. Rate limiting is especially critical on authentication endpoints, password reset, and any resource-expensive operation. Apply different limits per endpoint type.
+Without rate limiting, untrusted clients can brute-force passwords, enumerate accounts, scrape data, or overwhelm your service. Rate limiting is especially critical on authentication endpoints, password reset, and any resource-expensive operation. Apply different limits per endpoint type.
 
-**Vulnerable (no rate limiting):**
+**Non-compliant (no rate limiting):**
 
 ```typescript
-// ❌ No limit — attacker can try millions of passwords
+// ❌ No limit — untrusted client can try millions of passwords
 app.post('/auth/login', async (req, res) => {
   const user = await verifyCredentials(req.body.email, req.body.password)
   if (!user) return res.status(401).json({ error: 'Invalid credentials' })
   res.json({ token: issueToken(user) })
 })
 
-// ❌ Password reset — attacker enumerates valid emails at will
+// ❌ Password reset — untrusted client enumerates valid emails at will
 app.post('/auth/forgot-password', async (req, res) => {
   await sendResetEmail(req.body.email)
   res.json({ success: true })
@@ -75,4 +75,4 @@ async function trackFailedLogin(userId: string) {
 
 Use Redis-backed stores so rate limits survive process restarts and work across multiple instances. Add Captcha for high-value auth endpoints as a second layer.
 
-Reference: [OWASP Blocking Brute Force Attacks](https://owasp.org/www-community/controls/Blocking_Brute_Force_Attacks)
+Reference: [OWASP Blocking Brute Force Risks](https://owasp.org/www-community/controls/Blocking_Brute_Force_Risks)

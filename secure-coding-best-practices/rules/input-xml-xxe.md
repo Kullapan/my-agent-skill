@@ -9,9 +9,9 @@ tags: security, xxe, xml, injection, external-entities, ssrf
 
 **Impact: CRITICAL — CWE-611**
 
-XML eXternal Entity (XXE) attacks exploit insecure XML parsers to read local files (`/etc/passwd`, `.env`), perform SSRF to internal services, or cause denial of service. By default, many XML parsers allow external entity resolution. Disable it explicitly.
+XML eXternal Entity (XXE) risks abuse insecure XML parsers to read local files (`/etc/passwd`, `.env`), perform SSRF to internal services, or cause denial of service. By default, many XML parsers allow external entity resolution. Disable it explicitly.
 
-**Vulnerable (default XML parser config):**
+**Non-compliant (default XML parser config):**
 
 ```typescript
 // ❌ node-expat, libxmljs — external entities enabled by default
@@ -22,7 +22,7 @@ const doc = libxmljs.parseXml(req.body)  // external entities resolved!
 import { parseString } from 'xml2js'
 parseString(req.body, callback)  // check if noent: false is needed
 
-// Example malicious payload:
+// Example untrusted payload:
 // <?xml version="1.0"?>
 // <!DOCTYPE foo [
 //   <!ENTITY xxe SYSTEM "file:///etc/passwd">

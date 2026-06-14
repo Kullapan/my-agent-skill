@@ -11,7 +11,7 @@ tags: security, sca, sbom, cyclonedx, spdx, supply-chain, compliance, ntia
 
 A Software Bill of Materials (SBOM) is a formal, machine-readable inventory of every component in your software — direct dependencies, transitive dependencies, OS packages, and containers. SBOMs are required by US Executive Order 14028 for government software, and increasingly required by enterprise customers for vendor risk management. Without an SBOM, you cannot quickly answer "are we affected by Log4Shell?" when a new zero-day drops.
 
-**Vulnerable (no SBOM — blind to component inventory):**
+**Non-compliant (no SBOM — blind to component inventory):**
 
 ```bash
 # ❌ No SBOM generated — when Log4Shell (CVE-2021-44228) dropped:

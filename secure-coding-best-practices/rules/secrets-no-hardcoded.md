@@ -11,7 +11,7 @@ tags: security, secrets, credentials, api-keys, environment-variables, hardcoded
 
 Hardcoded secrets are committed to version control and exposed to anyone with repository access — including CI systems, contractors, and if the repo is public, the entire internet. Secrets accidentally committed persist in git history even after deletion. Use environment variables loaded from a secrets manager, never string literals.
 
-**Vulnerable (secrets in source code):**
+**Non-compliant (secrets in source code):**
 
 ```typescript
 // ❌ Hardcoded API key — visible in git history forever
@@ -58,6 +58,6 @@ async function getSecret(secretId: string): Promise<string> {
 const stripeKey = await getSecret('prod/stripe/secret-key')
 ```
 
-Add `.env` to `.gitignore`. Use `.env.example` with placeholder values for documentation. Rotate any secret that has been committed — treat it as compromised immediately.
+Add `.env` to `.gitignore`. Use `.env.example` with placeholder values for documentation. Rotate any secret that has been committed — treat it as unauthorized accessd immediately.
 
 Reference: [OWASP Secrets Management Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Secrets_Management_Cheat_Sheet.html)

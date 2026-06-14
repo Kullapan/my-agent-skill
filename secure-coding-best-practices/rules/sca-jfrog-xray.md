@@ -1,7 +1,7 @@
 ---
 title: Integrate JFrog Xray for Deep Artifact and Container SCA
 impact: CRITICAL
-impactDescription: CWE-1104 — OWASP A06 Vulnerable and Outdated Components
+impactDescription: CWE-1104 — OWASP A06 Non-compliant and Outdated Components
 tags: security, sca, jfrog, xray, artifacts, container, supply-chain, cve, jfrog-platform
 ---
 
@@ -9,9 +9,9 @@ tags: security, sca, jfrog, xray, artifacts, container, supply-chain, cve, jfrog
 
 **Impact: CRITICAL — CWE-1104**
 
-JFrog Xray performs recursive Software Composition Analysis (SCA) on every artifact stored in JFrog Artifactory — including transitive dependencies, container layers, and compiled binaries. Unlike `npm audit` (which only scans metadata), Xray inspects actual artifact content and matches against multiple vulnerability databases (NVD, VulnDB, GitHub Advisory). Configure Xray policies to **block downloads and promotions** when HIGH or CRITICAL CVEs are found.
+JFrog Xray performs recursive Software Composition Analysis (SCA) on every artifact stored in JFrog Artifactory — including transitive dependencies, container layers, and compiled binaries. Unlike `npm audit` (which only scans metadata), Xray inspects actual artifact content and matches against multiple code gap databases (NVD, VulnDB, GitHub Advisory). Configure Xray policies to **block downloads and promotions** when HIGH or CRITICAL CVEs are found.
 
-**Vulnerable (no Xray policy — artifacts flow through untouched):**
+**Non-compliant (no Xray policy — artifacts flow through untouched):**
 
 ```bash
 # ❌ Artifactory without Xray — any artifact is served regardless of CVEs

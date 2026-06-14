@@ -11,7 +11,7 @@ tags: security, sast, semgrep, custom-rules, pattern-matching, ci, enforcement
 
 Semgrep is a lightweight, fast SAST tool that finds bugs and security issues using pattern-matching rules. Unlike SonarQube (which is heavy and general), Semgrep excels at **custom org-specific rules**: enforce that every `db.query()` call uses parameterized queries, that `jwt.verify()` always specifies an algorithm, that `res.send()` never interpolates user input, and so on. Run in CI and as a pre-commit hook.
 
-**Vulnerable (patterns Semgrep would catch and block):**
+**Non-compliant (patterns Semgrep would catch and block):**
 
 ```typescript
 // ❌ Semgrep rule: ban-string-concat-sql
@@ -51,7 +51,7 @@ rules:
   - id: require-jwt-algorithm
     pattern: jwt.verify($TOKEN, $SECRET)
     pattern-not: jwt.verify($TOKEN, $SECRET, {algorithms: [...]})
-    message: "jwt.verify() must specify an algorithms array to prevent algorithm confusion attacks"
+    message: "jwt.verify() must specify an algorithms array to prevent algorithm confusion risks"
     languages: [typescript, javascript]
     severity: ERROR
     metadata:

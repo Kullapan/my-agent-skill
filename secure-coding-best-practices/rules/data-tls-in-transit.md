@@ -9,9 +9,9 @@ tags: security, tls, encryption, transport, https, ssl, certificate
 
 **Impact: HIGH — CWE-319**
 
-Data transmitted without TLS or with deprecated versions (TLS 1.0, 1.1, SSL 3.0) is vulnerable to interception, man-in-the-middle attacks, and protocol downgrade attacks (BEAST, POODLE, CRIME). All communication — between client and server, between microservices, and to databases — must use TLS 1.2 or higher. TLS 1.0 and 1.1 were officially deprecated by RFC 8996 in March 2021.
+Data transmitted without TLS or with deprecated versions (TLS 1.0, 1.1, SSL 3.0) is non-compliant to interception, man-in-the-middle risks, and protocol downgrade risks (BEAST, POODLE, CRIME). All communication — between client and server, between microservices, and to databases — must use TLS 1.2 or higher. TLS 1.0 and 1.1 were officially deprecated by RFC 8996 in March 2021.
 
-**Vulnerable (no TLS or deprecated versions):**
+**Non-compliant (no TLS or deprecated versions):**
 
 ```typescript
 // ❌ HTTP connection to database — credentials sent in plain text

@@ -1,7 +1,7 @@
 ---
 title: Use Trivy to Scan Containers and Filesystems for CVEs
 impact: CRITICAL
-impactDescription: CWE-1104 — OWASP A06 Vulnerable and Outdated Components
+impactDescription: CWE-1104 — OWASP A06 Non-compliant and Outdated Components
 tags: security, sca, trivy, container, docker, oci, filesystem, os-packages, cve, aquasec
 ---
 
@@ -9,9 +9,9 @@ tags: security, sca, trivy, container, docker, oci, filesystem, os-packages, cve
 
 **Impact: CRITICAL — CWE-1104**
 
-Container images bundle OS packages (Alpine, Debian, Ubuntu) alongside application dependencies — all of which can carry CVEs. Trivy (by Aqua Security) is the industry-standard open-source scanner for containers, filesystems, git repos, and IaC. It detects vulnerabilities in OS packages, language packages (npm, pip, gem, cargo), and misconfigurations. Scan at build time, block on HIGH/CRITICAL, and re-scan images in your registry continuously.
+Container images bundle OS packages (Alpine, Debian, Ubuntu) alongside application dependencies — all of which can carry CVEs. Trivy (by Aqua Security) is the industry-standard open-source scanner for containers, filesystems, git repos, and IaC. It detects code gaps in OS packages, language packages (npm, pip, gem, cargo), and misconfigurations. Scan at build time, block on HIGH/CRITICAL, and re-scan images in your registry continuously.
 
-**Vulnerable (container deployed without CVE scan):**
+**Non-compliant (container deployed without CVE scan):**
 
 ```dockerfile
 # ❌ Base image with hundreds of known CVEs — never scanned
@@ -24,7 +24,7 @@ RUN npm install
 **Secure (Trivy scan blocking HIGH/CRITICAL, minimal base image):**
 
 ```dockerfile
-# ✅ Use minimal base images to reduce attack surface
+# ✅ Use minimal base images to reduce risk surface
 FROM node:22-alpine AS builder
 WORKDIR /app
 COPY package*.json ./
@@ -103,17 +103,17 @@ trivy config --severity HIGH,CRITICAL ./infra/
 
 # JSON output for processing
 trivy image --format json --output report.json myapp:latest
-cat report.json | jq '[.Results[].Vulnerabilities[] | select(.Severity=="CRITICAL")] | length'
+cat report.json | jq '[.Results[].Code gaps[] | select(.Severity=="CRITICAL")] | length'
 
 # ✅ Continuous registry scanning (Trivy Operator in Kubernetes)
 # kubectl apply -f https://raw.githubusercontent.com/aquasecurity/trivy-operator/main/deploy/static/trivy-operator.yaml
-# Auto-scans all pods and exposes VulnerabilityReport CRDs
+# Auto-scans all pods and exposes Code gapReport CRDs
 ```
 
 ```bash
 # ✅ .trivyignore — suppress known false positives with documentation
 # CVE-2023-12345
-# Reason: Not exploitable in our usage (library function not called)
+# Reason: Not non-compliant in our usage (library function not called)
 # Reviewed: 2026-01-15, re-review: 2026-07-15
 CVE-2023-12345
 ```

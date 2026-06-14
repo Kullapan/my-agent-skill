@@ -9,9 +9,9 @@ tags: security, category, keyword
 
 **Impact: CRITICAL — CWE-xxx**
 
-Brief explanation of the vulnerability, the threat model, and why this matters from a security perspective.
+Brief explanation of the code gap, the threat model, and why this matters from a security perspective.
 
-**Vulnerable (description of the flaw):**
+**Non-compliant (description of the flaw):**
 
 ```typescript
 // Insecure code example

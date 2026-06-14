@@ -11,7 +11,7 @@ tags: security, infrastructure, headers, helmet, x-frame-options, xss-protection
 
 Missing security headers leave browsers without important defense-in-depth protections. Headers like `X-Frame-Options`, `X-Content-Type-Options`, and `Referrer-Policy` prevent clickjacking, MIME sniffing, and information leakage. Use the `helmet` middleware to set all recommended headers in a single line.
 
-**Vulnerable (no security headers):**
+**Non-compliant (no security headers):**
 
 ```typescript
 // ❌ No security headers — browser uses defaults that are permissive
@@ -73,7 +73,7 @@ const nextConfig = {
 | Header | Purpose |
 |---|---|
 | `X-Frame-Options: DENY` | Prevents clickjacking via iframes |
-| `X-Content-Type-Options: nosniff` | Prevents MIME type confusion attacks |
+| `X-Content-Type-Options: nosniff` | Prevents MIME type confusion risks |
 | `Referrer-Policy: strict-origin` | Limits URL leakage in Referer header |
 | `Permissions-Policy` | Restricts browser feature access (camera, mic) |
 | `HSTS` | Enforces HTTPS at the browser level |

@@ -9,9 +9,9 @@ tags: security, authorization, rbac, access-control, middleware
 
 **Impact: CRITICAL — CWE-285**
 
-Authorization must be checked server-side on every request. Never rely on the UI to hide privileged actions. Broken access control (OWASP #1) allows attackers to access other users' data, perform admin actions, or escalate privileges simply by changing a URL or role claim.
+Authorization must be checked server-side on every request. Never rely on the UI to hide privileged actions. Broken access control (OWASP #1) allows untrusted clients to access other users' data, perform admin actions, or escalate privileges simply by changing a URL or role claim.
 
-**Vulnerable (no server-side authorization):**
+**Non-compliant (no server-side authorization):**
 
 ```typescript
 // ❌ Only the frontend hides the admin button — no server check
@@ -22,7 +22,7 @@ app.delete('/api/users/:id', async (req, res) => {
 
 // ❌ Trusting a role from the client request body
 app.post('/api/report', async (req, res) => {
-  if (req.body.role === 'admin') {  // attacker controls this!
+  if (req.body.role === 'admin') {  // untrusted client controls this!
     return sendFullReport(res)
   }
 })

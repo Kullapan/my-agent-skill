@@ -11,7 +11,7 @@ tags: security, error-handling, circuit-breaker, resilience, graceful-degradatio
 
 When a downstream service fails, applications that retry aggressively without backoff can amplify the failure into a cascading outage — overwhelming the struggling service, exhausting their own connection pools, and becoming unresponsive. A circuit breaker detects repeated failures and "opens" to stop sending requests, returning a fallback response instead. This protects both the downstream service (time to recover) and the calling application (remains responsive).
 
-**Vulnerable (no circuit breaker — cascading failure):**
+**Non-compliant (no circuit breaker — cascading failure):**
 
 ```typescript
 // ❌ Unbounded retries — amplifies downstream failures

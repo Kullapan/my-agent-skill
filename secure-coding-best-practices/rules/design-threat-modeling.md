@@ -11,7 +11,7 @@ tags: security, design, threat-modeling, stride, architecture, abuse-cases
 
 Insecure design cannot be fixed by code review alone — it requires identifying threats before writing code. Without threat modeling, teams discover security flaws in production (or not at all). A lightweight STRIDE-based threat model during design forces explicit thinking about trust boundaries, data flows, and abuse scenarios. This is the primary defense against OWASP A06 "Insecure Design" — the category that captures architectural flaws no amount of secure coding can fix.
 
-**Vulnerable (no threat model — security discovered too late):**
+**Non-compliant (no threat model — security discovered too late):**
 
 ```typescript
 // ❌ Feature designed and built without threat analysis
@@ -19,7 +19,7 @@ Insecure design cannot be fixed by code review alone — it requires identifying
 //
 // What the team missed:
 //   - No expiry on share links → permanent access even after revocation intent
-//   - Sequential share IDs → attacker can enumerate all shared files
+//   - Sequential share IDs → untrusted client can enumerate all shared files
 //   - No access logging → breach goes undetected
 //   - No rate limiting on link creation → mass exfiltration tool
 //   - Shared files include metadata with internal user IDs
@@ -52,7 +52,7 @@ User → API Gateway → Share Service → Object Storage
 
 | Threat | Category | Mitigation |
 |--------|----------|------------|
-| Attacker guesses share IDs | Spoofing | Use UUID v4 (128-bit random), not sequential IDs |
+| Untrusted client guesses share IDs | Spoofing | Use UUID v4 (128-bit random), not sequential IDs |
 | Revoked link still works | Tampering | Expire links after 7 days, support manual revocation |
 | No record of who accessed | Repudiation | Log every access with IP, user-agent, timestamp |
 | Shared file leaks metadata | Information Disclosure | Strip internal metadata before serving |
@@ -60,7 +60,7 @@ User → API Gateway → Share Service → Object Storage
 | Link bypasses file permissions | Elevation of Privilege | Verify sharer still has access on every link use |
 
 ## Abuse Cases
-- Attacker creates thousands of share links to exfiltrate entire drive
+- Untrusted client creates thousands of share links to exfiltrate entire drive
 - Former employee's share links remain active after account deletion
 - Search engines index share links, making files publicly discoverable
 ```

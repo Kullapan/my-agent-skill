@@ -11,7 +11,7 @@ tags: security, data-protection, encryption, aes, at-rest, database, pii
 
 A database breach exposes unencrypted PII (SSNs, health records, payment data) in plaintext. Encrypt sensitive fields at the application layer with AES-256-GCM, so even a full database dump is useless without the encryption key. This is distinct from TLS in transit — encryption at rest protects against database exfiltration, backup theft, and insider threats.
 
-**Vulnerable (PII stored in plaintext):**
+**Non-compliant (PII stored in plaintext):**
 
 ```typescript
 // ❌ SSN, card number, health data stored in plaintext

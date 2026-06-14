@@ -9,9 +9,9 @@ tags: security, authentication, sessions, cookies, xss, csrf
 
 **Impact: CRITICAL — CWE-614**
 
-Session cookies without `HttpOnly` can be stolen via XSS. Without `Secure`, they travel over plaintext HTTP. Without `SameSite=Strict` or `Lax`, they are sent on cross-site requests enabling CSRF attacks. All three attributes are required.
+Session cookies without `HttpOnly` can be stolen via XSS. Without `Secure`, they travel over plaintext HTTP. Without `SameSite=Strict` or `Lax`, they are sent on cross-site requests enabling CSRF risks. All three attributes are required.
 
-**Vulnerable (missing cookie security attributes):**
+**Non-compliant (missing cookie security attributes):**
 
 ```typescript
 // ❌ Cookie readable by JavaScript — XSS can steal session
@@ -20,7 +20,7 @@ res.cookie('sessionId', token)
 // ❌ No Secure flag — sent over HTTP
 res.cookie('sessionId', token, { httpOnly: true })
 
-// ❌ No SameSite — CSRF vulnerable
+// ❌ No SameSite — CSRF non-compliant
 res.cookie('sessionId', token, { httpOnly: true, secure: true })
 ```
 

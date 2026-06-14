@@ -9,19 +9,19 @@ tags: security, ssrf, server-side-request-forgery, url-validation, access-contro
 
 **Impact: CRITICAL — CWE-918**
 
-Server-Side Request Forgery (SSRF) occurs when an application fetches a URL provided by the user without validating the destination. Attackers exploit this to access internal services (metadata APIs, databases, admin panels), scan private networks, or exfiltrate data through the server. SSRF was OWASP A10 in 2021 and remains a top threat — the 2019 Capital One breach was caused by SSRF targeting the AWS metadata endpoint.
+Server-Side Request Forgery (SSRF) occurs when an application fetches a URL provided by the user without validating the destination. Untrusted clients abuse this to access internal services (metadata APIs, databases, admin panels), scan private networks, or exfiltrate data through the server. SSRF was OWASP A10 in 2021 and remains a top threat — the 2019 Capital One breach was caused by SSRF targeting the AWS metadata endpoint.
 
-**Vulnerable (unvalidated URL from user input):**
+**Non-compliant (unvalidated URL from user input):**
 
 ```typescript
 // ❌ Fetches any URL the user provides — including internal services
 app.post('/api/preview', async (req, res) => {
   const { url } = req.body
 
-  // Attacker sends: url = "http://169.254.169.254/latest/meta-data/iam/security-credentials/"
-  // → Server fetches AWS IAM credentials and returns them to the attacker
+  // Untrusted client sends: url = "http://169.254.169.254/latest/meta-data/iam/security-credentials/"
+  // → Server fetches AWS IAM credentials and returns them to the untrusted client
 
-  // Attacker sends: url = "http://10.0.0.5:6379/CONFIG+SET+dir+/var/www/html"
+  // Untrusted client sends: url = "http://10.0.0.5:6379/CONFIG+SET+dir+/var/www/html"
   // → Server sends commands to internal Redis
 
   const response = await fetch(url)
@@ -30,7 +30,7 @@ app.post('/api/preview', async (req, res) => {
 })
 
 // ❌ DNS rebinding bypasses hostname checks
-// Attacker's DNS returns 1.2.3.4 on first lookup (passes validation)
+// Untrusted client's DNS returns 1.2.3.4 on first lookup (passes validation)
 // then 169.254.169.254 on second lookup (actual fetch hits metadata API)
 ```
 

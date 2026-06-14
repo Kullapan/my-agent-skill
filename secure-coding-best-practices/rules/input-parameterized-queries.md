@@ -9,12 +9,12 @@ tags: security, injection, sql, database, parameterized-queries, orm
 
 **Impact: CRITICAL — CWE-89**
 
-SQL injection is the most exploited injection vulnerability. Concatenating user input into SQL strings allows attackers to read any table, bypass authentication, delete data, or execute OS commands via `xp_cmdshell`. Always use parameterized queries or an ORM that handles escaping.
+SQL injection is the most abused injection code gap. Concatenating user input into SQL strings allows untrusted clients to read any table, bypass authentication, delete data, or execute OS commands via `xp_cmdshell`. Always use parameterized queries or an ORM that handles escaping.
 
-**Vulnerable (string concatenation):**
+**Non-compliant (string concatenation):**
 
 ```typescript
-// ❌ Classic SQL injection — attacker enters: ' OR '1'='1
+// ❌ Classic SQL injection — untrusted client enters: ' OR '1'='1
 const query = `SELECT * FROM users WHERE email = '${req.body.email}'`
 const user = await db.raw(query)
 
