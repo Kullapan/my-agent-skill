@@ -44,7 +44,7 @@ gh skill install <OWNER>/<REPO> my-skill-name
 ```
 
 ### Prerequisites
-- GitHub CLI (`gh`) v2.90.0 or later installed and authenticated.
+- GitHub CLI (`gh`) v2.90.0 or later installed and authenticated. Run `gh auth login` to log in (unauthenticated requests will fail due to API rate limits).
 - Replace `<OWNER>/<REPO>` with the path of the repository hosting this skill library (e.g., `your-org/shared-skills`).
 - Replace `my-skill-name` with the directory name of your skill.
 

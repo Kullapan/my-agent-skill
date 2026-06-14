@@ -1,5 +1,5 @@
 {
-  "version": "1.0.0",
+  "version": "2.0.0",
   "author": "Backend Engineering",
-  "tags": ["kotlin", "spring-boot", "webflux", "reactive", "coroutines", "non-blocking"]
+  "tags": ["kotlin", "spring-boot", "webflux", "reactive", "coroutines", "non-blocking", "webclient", "r2dbc", "security", "resilience", "observability", "testing"]
 }

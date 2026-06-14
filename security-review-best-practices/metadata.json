@@ -1,8 +1,9 @@
 {
-  "version": "1.0.0",
+  "version": "2.0.0",
   "organization": "Security Engineering",
   "date": "June 2026",
-  "abstract": "Comprehensive security review guide for web applications and APIs. Contains 35+ rules across 8 OWASP-aligned categories covering authentication, injection prevention, secrets management, API security, data protection, dependency hygiene, error handling, and infrastructure hardening. Each rule includes vulnerable vs. secure code examples to guide automated code review, generation, and security audits.",
+  "abstract": "Static Application Security Testing (SAST) guide for web applications and APIs, aligned to OWASP Top 10:2025. Contains 50 rules across 11 categories covering authentication, injection prevention, secrets management, API security, data protection, dependency analysis, error handling, infrastructure hardening, SCA/CVE scanning, SAST tooling, and secure design. All rules are evaluable through static code review — no dynamic scanning required.",
+  "tags": ["security", "owasp", "owasp-top-10", "owasp-2025", "sast", "authentication", "authorization", "injection", "secrets", "api", "cryptography", "threat-modeling", "jfrog-xray", "sonarqube", "semgrep", "codeql", "trivy", "sca", "cve"],
   "references": [
     "https://owasp.org/www-project-top-ten/",
     "https://owasp.org/www-project-api-security/",

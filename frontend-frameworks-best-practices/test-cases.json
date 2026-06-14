@@ -1,8 +1,85 @@
 {
-  "generated": "2026-06-14T07:05:17.949Z",
+  "generated": "2026-06-14T09:12:11.805Z",
   "skill": "frontend-frameworks-best-practices",
-  "total": 4,
+  "total": 20,
   "testCases": [
+    {
+      "skill": "frontend-frameworks-best-practices",
+      "rule": "a11y-keyboard-focus",
+      "title": "Ensure all interactive elements are keyboard-accessible with visible focus indicators",
+      "impact": "HIGH",
+      "tags": [
+        "accessibility",
+        "a11y",
+        "keyboard",
+        "focus",
+        "tab-order",
+        "focus-visible"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "tsx",
+            "code": "// ❌ outline: none removes all focus visibility; div is not focusable via keyboard\nfunction CategoryDropdown({ categories, onSelect }: CategoryDropdownProps) {\n  const [isOpen, setIsOpen] = useState(false);\n  const [selected, setSelected] = useState<string | null>(null);\n\n  return (\n    <div className=\"dropdown\" onClick={() => setIsOpen(!isOpen)}>\n      <div className=\"dropdown-trigger\" style={{ outline: \"none\" }}>\n        {selected ?? \"Select a category\"}\n        <ChevronDownIcon />\n      </div>\n      {isOpen && (\n        <div className=\"dropdown-menu\">\n          {categories.map((cat) => (\n            <div\n              key={cat.id}\n              className=\"dropdown-item\"\n              onClick={() => {\n                setSelected(cat.name);\n                onSelect(cat.id);\n                setIsOpen(false);\n              }}\n            >\n              {cat.name}\n            </div>\n          ))}\n        </div>\n      )}\n    </div>\n  );\n}"
+          },
+          "correct": {
+            "lang": "tsx",
+            "code": "// ✅ Uses button for trigger, focus-visible for keyboard-only outlines, and full keyboard handling\nfunction CategoryDropdown({ categories, onSelect }: CategoryDropdownProps) {\n  const [isOpen, setIsOpen] = useState(false);\n  const [selected, setSelected] = useState<string | null>(null);\n  const [activeIndex, setActiveIndex] = useState(-1);\n\n  const handleKeyDown = (e: React.KeyboardEvent) => {\n    if (e.key === \"ArrowDown\") {\n      e.preventDefault();\n      setActiveIndex((i) => Math.min(i + 1, categories.length - 1));\n    } else if (e.key === \"ArrowUp\") {\n      e.preventDefault();\n      setActiveIndex((i) => Math.max(i - 1, 0));\n    } else if (e.key === \"Enter\" && activeIndex >= 0) {\n      setSelected(categories[activeIndex].name);\n      onSelect(categories[activeIndex].id);\n      setIsOpen(false);\n    } else if (e.key === \"Escape\") {\n      setIsOpen(false);\n    }\n  };\n\n  return (\n    <div className=\"dropdown\" onKeyDown={handleKeyDown}>\n      <button\n        type=\"button\"\n        className=\"dropdown-trigger\"\n        aria-haspopup=\"listbox\"\n        aria-expanded={isOpen}\n        onClick={() => setIsOpen(!isOpen)}\n      >\n        {selected ?? \"Select a category\"}\n        <ChevronDownIcon />\n      </button>\n      {isOpen && (\n        <ul role=\"listbox\" className=\"dropdown-menu\">\n          {categories.map((cat, index) => (\n            <li\n              key={cat.id}\n              role=\"option\"\n              tabIndex={-1}\n              aria-selected={index === activeIndex}\n              className={`dropdown-item ${index === activeIndex ? \"active\" : \"\"}`}\n              onClick={() => {\n                setSelected(cat.name);\n                onSelect(cat.id);\n                setIsOpen(false);\n              }}\n            >\n              {cat.name}\n            </li>\n          ))}\n        </ul>\n      )}\n    </div>\n  );\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "frontend-frameworks-best-practices",
+      "rule": "a11y-semantic-html",
+      "title": "Use semantic HTML elements instead of generic divs and spans",
+      "impact": "CRITICAL",
+      "tags": [
+        "accessibility",
+        "a11y",
+        "semantic-html",
+        "aria",
+        "screen-reader"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "tsx",
+            "code": "// ❌ Divs with onClick handlers are not focusable, have no roles, and break keyboard/screen-reader access\nfunction SiteNavigation() {\n  return (\n    <div className=\"nav-bar\">\n      <div className=\"nav-logo\" onClick={() => navigate(\"/\")}>\n        MyApp\n      </div>\n      <div className=\"nav-links\">\n        <div className=\"nav-item\" onClick={() => navigate(\"/dashboard\")}>\n          Dashboard\n        </div>\n        <div className=\"nav-item\" onClick={() => navigate(\"/projects\")}>\n          Projects\n        </div>\n        <div className=\"nav-item\" onClick={() => navigate(\"/settings\")}>\n          Settings\n        </div>\n      </div>\n      <div className=\"nav-item\" onClick={() => handleLogout()}>\n        Log Out\n      </div>\n    </div>\n  );\n}"
+          },
+          "correct": {
+            "lang": "tsx",
+            "code": "// ✅ Semantic elements provide built-in keyboard access, ARIA roles, and screen-reader announcements\nfunction SiteNavigation() {\n  return (\n    <nav aria-label=\"Main navigation\">\n      <a href=\"/\" className=\"nav-logo\">\n        MyApp\n      </a>\n      <ul className=\"nav-links\">\n        <li>\n          <a href=\"/dashboard\">Dashboard</a>\n        </li>\n        <li>\n          <a href=\"/projects\">Projects</a>\n        </li>\n        <li>\n          <a href=\"/settings\">Settings</a>\n        </li>\n      </ul>\n      <button type=\"button\" onClick={handleLogout} className=\"nav-logout\">\n        Log Out\n      </button>\n    </nav>\n  );\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "frontend-frameworks-best-practices",
+      "rule": "comp-composition-over-config",
+      "title": "Prefer composition over configuration for flexible components",
+      "impact": "HIGH",
+      "tags": [
+        "react",
+        "vue",
+        "components",
+        "composition",
+        "patterns",
+        "slots"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "tsx",
+            "code": "// ❌ Every layout variation requires a new prop and internal branching\ninterface CardProps {\n  title?: string;\n  subtitle?: string;\n  showHeader?: boolean;\n  showFooter?: boolean;\n  footerText?: string;\n  icon?: React.ReactNode;\n  iconPosition?: \"left\" | \"right\";\n  variant?: \"default\" | \"outlined\" | \"elevated\";\n  size?: \"sm\" | \"md\" | \"lg\";\n  actions?: React.ReactNode;\n  headerExtra?: React.ReactNode;\n  imageSrc?: string;\n  imagePosition?: \"top\" | \"bottom\";\n  children: React.ReactNode;\n}\n\nfunction Card({\n  title, subtitle, showHeader = true, showFooter = false,\n  footerText, icon, iconPosition = \"left\", variant = \"default\",\n  size = \"md\", actions, headerExtra, imageSrc, imagePosition = \"top\",\n  children,\n}: CardProps) {\n  return (\n    <div className={`card card--${variant} card--${size}`}>\n      {imageSrc && imagePosition === \"top\" && <img src={imageSrc} />}\n      {showHeader && (\n        <div className=\"card-header\">\n          {icon && iconPosition === \"left\" && icon}\n          <div>\n            {title && <h3>{title}</h3>}\n            {subtitle && <p>{subtitle}</p>}\n          </div>\n          {icon && iconPosition === \"right\" && icon}\n          {headerExtra}\n        </div>\n      )}\n      <div className=\"card-body\">{children}</div>\n      {imageSrc && imagePosition === \"bottom\" && <img src={imageSrc} />}\n      {showFooter && (\n        <div className=\"card-footer\">\n          {footerText && <span>{footerText}</span>}\n          {actions}\n        </div>\n      )}\n    </div>\n  );\n}"
+          },
+          "correct": {
+            "lang": "tsx",
+            "code": "// ✅ Consumers compose exactly the layout they need — no props, no branching\n\ninterface CardProps {\n  variant?: \"default\" | \"outlined\" | \"elevated\";\n  size?: \"sm\" | \"md\" | \"lg\";\n  children: React.ReactNode;\n}\n\nfunction Card({ variant = \"default\", size = \"md\", children }: CardProps) {\n  return <div className={`card card--${variant} card--${size}`}>{children}</div>;\n}\n\nCard.Header = function CardHeader({ children }: { children: React.ReactNode }) {\n  return <div className=\"card-header\">{children}</div>;\n};\n\nCard.Body = function CardBody({ children }: { children: React.ReactNode }) {\n  return <div className=\"card-body\">{children}</div>;\n};\n\nCard.Footer = function CardFooter({ children }: { children: React.ReactNode }) {\n  return <div className=\"card-footer\">{children}</div>;\n};\n\nCard.Image = function CardImage({ src, alt }: { src: string; alt: string }) {\n  return <img className=\"card-image\" src={src} alt={alt} />;\n};\n\n// Usage — each consumer defines its own layout\n<Card variant=\"elevated\">\n  <Card.Image src=\"/product.jpg\" alt=\"Product photo\" />\n  <Card.Header>\n    <ShoppingCartIcon />\n    <h3>Premium Plan</h3>\n  </Card.Header>\n  <Card.Body>\n    <p>Unlock all features with our premium offering.</p>\n  </Card.Body>\n  <Card.Footer>\n    <Button variant=\"primary\">Subscribe</Button>\n    <Button variant=\"ghost\">Learn more</Button>\n  </Card.Footer>\n</Card>"
+          }
+        }
+      ]
+    },
     {
       "skill": "frontend-frameworks-best-practices",
       "rule": "comp-pure-components",
@@ -25,6 +102,56 @@
           "correct": {
             "lang": "jsx",
             "code": "// ✅ Presentation component: pure, testable, and reusable\nfunction UserProfileCard({ user, onDelete }) {\n  return (\n    <div className=\"p-4 border rounded\">\n      <h2 className=\"text-xl font-bold\">{user.name}</h2>\n      <button onClick={() => onDelete(user.id)}>Delete</button>\n    </div>\n  );\n}\n\n// ✅ Container component: handles data fetching and logic\nfunction UserProfileContainer({ userId }) {\n  // Use a data fetching library like React Query or SWR\n  const { data: user, isLoading } = useUser(userId);\n  const deleteMutation = useDeleteUser();\n\n  if (isLoading) return <LoadingSpinner />;\n\n  return (\n    <UserProfileCard \n      user={user} \n      onDelete={(id) => deleteMutation.mutate(id)} \n    />\n  );\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "frontend-frameworks-best-practices",
+      "rule": "comp-single-responsibility",
+      "title": "Keep components focused on a single responsibility",
+      "impact": "CRITICAL",
+      "tags": [
+        "react",
+        "vue",
+        "components",
+        "architecture",
+        "single-responsibility"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "tsx",
+            "code": "// ❌ One component owns layout, filtering, charting, and table rendering\nfunction Dashboard() {\n  const [filter, setFilter] = useState({ dateRange: \"7d\", status: \"all\" });\n  const [data, setData] = useState<SalesRecord[]>([]);\n  const [loading, setLoading] = useState(true);\n\n  useEffect(() => {\n    setLoading(true);\n    fetch(`/api/sales?range=${filter.dateRange}&status=${filter.status}`)\n      .then((res) => res.json())\n      .then((json) => { setData(json); setLoading(false); });\n  }, [filter]);\n\n  const chartData = data.map((d) => ({ x: d.date, y: d.revenue }));\n  const totalRevenue = data.reduce((sum, d) => sum + d.revenue, 0);\n\n  return (\n    <div className=\"dashboard\">\n      <header className=\"dashboard-header\">\n        <h1>Sales Dashboard</h1>\n        <span>Total: ${totalRevenue.toLocaleString()}</span>\n      </header>\n      <aside className=\"dashboard-sidebar\">\n        <select value={filter.dateRange} onChange={(e) => setFilter({ ...filter, dateRange: e.target.value })}>\n          <option value=\"7d\">Last 7 days</option>\n          <option value=\"30d\">Last 30 days</option>\n          <option value=\"90d\">Last 90 days</option>\n        </select>\n        <select value={filter.status} onChange={(e) => setFilter({ ...filter, status: e.target.value })}>\n          <option value=\"all\">All</option>\n          <option value=\"completed\">Completed</option>\n          <option value=\"pending\">Pending</option>\n        </select>\n      </aside>\n      <main>\n        {loading ? <Spinner /> : (\n          <>\n            <div className=\"chart-container\">\n              <LineChart data={chartData} xKey=\"x\" yKey=\"y\" height={300} />\n            </div>\n            <table className=\"data-table\">\n              <thead>\n                <tr><th>Date</th><th>Customer</th><th>Revenue</th><th>Status</th></tr>\n              </thead>\n              <tbody>\n                {data.map((row) => (\n                  <tr key={row.id}>\n                    <td>{row.date}</td><td>{row.customer}</td>\n                    <td>${row.revenue}</td><td>{row.status}</td>\n                  </tr>\n                ))}\n              </tbody>\n            </table>\n          </>\n        )}\n      </main>\n    </div>\n  );\n}"
+          },
+          "correct": {
+            "lang": "tsx",
+            "code": "// ✅ Each component has a single job — fetch, filter, chart, or table\n\nfunction Dashboard() {\n  const [filter, setFilter] = useState({ dateRange: \"7d\", status: \"all\" });\n  const { data, loading } = useSalesData(filter);\n\n  return (\n    <DashboardLayout\n      header={<DashboardHeader totalRevenue={data?.totalRevenue ?? 0} />}\n      sidebar={<DashboardFilters filter={filter} onChange={setFilter} />}\n    >\n      {loading ? <Spinner /> : (\n        <>\n          <DashboardChart data={data.records} />\n          <DataTable columns={salesColumns} rows={data.records} />\n        </>\n      )}\n    </DashboardLayout>\n  );\n}\n\nfunction DashboardFilters({ filter, onChange }: DashboardFiltersProps) {\n  return (\n    <aside className=\"dashboard-sidebar\">\n      <Select label=\"Date range\" value={filter.dateRange}\n        options={DATE_RANGE_OPTIONS}\n        onChange={(dateRange) => onChange({ ...filter, dateRange })} />\n      <Select label=\"Status\" value={filter.status}\n        options={STATUS_OPTIONS}\n        onChange={(status) => onChange({ ...filter, status })} />\n    </aside>\n  );\n}\n\nfunction DataTable<T>({ columns, rows }: DataTableProps<T>) {\n  return (\n    <table className=\"data-table\">\n      <thead>\n        <tr>{columns.map((col) => <th key={col.key}>{col.label}</th>)}</tr>\n      </thead>\n      <tbody>\n        {rows.map((row, i) => (\n          <tr key={i}>{columns.map((col) => <td key={col.key}>{col.render(row)}</td>)}</tr>\n        ))}\n      </tbody>\n    </table>\n  );\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "frontend-frameworks-best-practices",
+      "rule": "css-responsive-design",
+      "title": "Use Tailwind responsive prefixes for mobile-first design",
+      "impact": "HIGH",
+      "tags": [
+        "tailwindcss",
+        "css",
+        "responsive",
+        "mobile-first",
+        "breakpoints"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "html",
+            "code": "<!-- ❌ Custom @media queries fight Tailwind's breakpoint system -->\n<style>\n  .dashboard-grid {\n    display: flex;\n    flex-direction: column;\n    gap: 1rem;\n  }\n  @media (min-width: 820px) {\n    .dashboard-grid {\n      flex-direction: row;\n      gap: 2rem;\n    }\n  }\n  @media (min-width: 1100px) {\n    .dashboard-grid {\n      gap: 3rem;\n    }\n  }\n</style>\n\n<div class=\"dashboard-grid p-4\">\n  <aside class=\"w-full bg-white rounded-lg shadow p-4\">\n    <h2 class=\"text-lg font-semibold\">Filters</h2>\n    <!-- filter controls -->\n  </aside>\n  <main class=\"w-full bg-white rounded-lg shadow p-4\">\n    <h1 class=\"text-xl font-bold\">Results</h1>\n    <!-- result cards -->\n  </main>\n</div>"
+          },
+          "correct": {
+            "lang": "html",
+            "code": "<!-- ✅ Mobile-first: base styles for small screens, responsive prefixes for larger ones -->\n<div class=\"flex flex-col gap-4 p-4 md:flex-row md:gap-6 lg:gap-8\">\n  <aside class=\"w-full md:w-64 lg:w-72 bg-white rounded-lg shadow p-4\">\n    <h2 class=\"text-lg font-semibold\">Filters</h2>\n    <!-- filter controls -->\n  </aside>\n  <main class=\"w-full flex-1 bg-white rounded-lg shadow p-4\">\n    <h1 class=\"text-xl font-bold lg:text-2xl\">Results</h1>\n    <!-- result cards -->\n  </main>\n</div>"
           }
         }
       ]
@@ -58,6 +185,137 @@
     },
     {
       "skill": "frontend-frameworks-best-practices",
+      "rule": "err-async-error-handling",
+      "title": "Handle all async states: loading, error, and empty",
+      "impact": "HIGH",
+      "tags": [
+        "react",
+        "vue",
+        "async",
+        "error-handling",
+        "loading",
+        "empty-state",
+        "data-fetching"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "tsx",
+            "code": "// ❌ No loading indicator, no error handling, no empty state — fails silently in three out of four states\nfunction ProjectList() {\n  const [projects, setProjects] = useState<Project[]>([]);\n\n  useEffect(() => {\n    fetch(\"/api/projects\")\n      .then((res) => res.json())\n      .then((data) => setProjects(data));\n  }, []);\n\n  return (\n    <section className=\"project-list\">\n      <h2>Your Projects</h2>\n      {projects && (\n        <ul>\n          {projects.map((project) => (\n            <li key={project.id}>\n              <h3>{project.name}</h3>\n              <p>{project.description}</p>\n            </li>\n          ))}\n        </ul>\n      )}\n    </section>\n  );\n}"
+          },
+          "correct": {
+            "lang": "tsx",
+            "code": "// ✅ Explicit handling for loading, error, empty, and success states\nfunction ProjectList() {\n  const [projects, setProjects] = useState<Project[]>([]);\n  const [isLoading, setIsLoading] = useState(true);\n  const [error, setError] = useState<Error | null>(null);\n\n  useEffect(() => {\n    const controller = new AbortController();\n\n    async function fetchProjects() {\n      try {\n        setIsLoading(true);\n        setError(null);\n        const res = await fetch(\"/api/projects\", { signal: controller.signal });\n        if (!res.ok) throw new Error(`Failed to load projects (${res.status})`);\n        const data: Project[] = await res.json();\n        setProjects(data);\n      } catch (err) {\n        if (!controller.signal.aborted) {\n          setError(err instanceof Error ? err : new Error(\"Unknown error\"));\n        }\n      } finally {\n        if (!controller.signal.aborted) setIsLoading(false);\n      }\n    }\n\n    fetchProjects();\n    return () => controller.abort();\n  }, []);\n\n  if (isLoading) {\n    return <LoadingSpinner label=\"Loading projects…\" />;\n  }\n\n  if (error) {\n    return (\n      <ErrorMessage\n        title=\"Unable to load projects\"\n        detail={error.message}\n        onRetry={() => window.location.reload()}\n      />\n    );\n  }\n\n  if (projects.length === 0) {\n    return (\n      <EmptyState\n        icon={<FolderIcon />}\n        heading=\"No projects yet\"\n        description=\"Create your first project to get started.\"\n        action={<a href=\"/projects/new\">Create Project</a>}\n      />\n    );\n  }\n\n  return (\n    <section className=\"project-list\">\n      <h2>Your Projects</h2>\n      <ul>\n        {projects.map((project) => (\n          <li key={project.id}>\n            <h3>{project.name}</h3>\n            <p>{project.description}</p>\n          </li>\n        ))}\n      </ul>\n    </section>\n  );\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "frontend-frameworks-best-practices",
+      "rule": "err-error-boundaries",
+      "title": "Wrap feature sections in error boundaries to prevent full-app crashes",
+      "impact": "CRITICAL",
+      "tags": [
+        "react",
+        "vue",
+        "error-boundary",
+        "error-handling",
+        "resilience"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "tsx",
+            "code": "// ❌ If RevenueChart throws during render, the entire dashboard unmounts and the user sees a white screen\nfunction Dashboard() {\n  return (\n    <main className=\"dashboard\">\n      <header>\n        <h1>Analytics Dashboard</h1>\n      </header>\n      <div className=\"dashboard-grid\">\n        <RevenueChart />\n        <UserActivityFeed />\n        <ConversionMetrics />\n        <RecentOrdersTable />\n      </div>\n    </main>\n  );\n}"
+          },
+          "correct": {
+            "lang": "tsx",
+            "code": "// ✅ Each section is isolated — a crash in RevenueChart only affects that widget\nimport { ErrorBoundary } from \"react-error-boundary\";\n\nfunction ErrorFallback({ error, resetErrorBoundary }: FallbackProps) {\n  return (\n    <div role=\"alert\" className=\"error-panel\">\n      <p>Something went wrong loading this section.</p>\n      <pre className=\"error-detail\">{error.message}</pre>\n      <button onClick={resetErrorBoundary}>Try again</button>\n    </div>\n  );\n}\n\nfunction Dashboard() {\n  return (\n    <main className=\"dashboard\">\n      <header>\n        <h1>Analytics Dashboard</h1>\n      </header>\n      <div className=\"dashboard-grid\">\n        <ErrorBoundary FallbackComponent={ErrorFallback}>\n          <RevenueChart />\n        </ErrorBoundary>\n        <ErrorBoundary FallbackComponent={ErrorFallback}>\n          <UserActivityFeed />\n        </ErrorBoundary>\n        <ErrorBoundary FallbackComponent={ErrorFallback}>\n          <ConversionMetrics />\n        </ErrorBoundary>\n        <ErrorBoundary FallbackComponent={ErrorFallback}>\n          <RecentOrdersTable />\n        </ErrorBoundary>\n      </div>\n    </main>\n  );\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "frontend-frameworks-best-practices",
+      "rule": "form-controlled-inputs",
+      "title": "Use form libraries for complex forms instead of manual state management",
+      "impact": "MEDIUM",
+      "tags": [
+        "react",
+        "vue",
+        "forms",
+        "controlled-inputs",
+        "react-hook-form",
+        "vee-validate"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "tsx",
+            "code": "// ❌ Boilerplate explosion – each field needs its own state, onChange, and validation\nimport { useState, FormEvent } from 'react';\n\nfunction RegistrationForm() {\n  const [firstName, setFirstName] = useState('');\n  const [lastName, setLastName] = useState('');\n  const [email, setEmail] = useState('');\n  const [password, setPassword] = useState('');\n  const [confirmPassword, setConfirmPassword] = useState('');\n  const [errors, setErrors] = useState<Record<string, string>>({});\n\n  const handleSubmit = (e: FormEvent) => {\n    e.preventDefault();\n    const newErrors: Record<string, string> = {};\n    if (!firstName) newErrors.firstName = 'First name is required';\n    if (!email.includes('@')) newErrors.email = 'Invalid email';\n    if (password.length < 8) newErrors.password = 'Min 8 characters';\n    if (password !== confirmPassword) newErrors.confirmPassword = 'Passwords must match';\n    setErrors(newErrors);\n    if (Object.keys(newErrors).length === 0) {\n      // submit\n    }\n  };\n\n  return (\n    <form onSubmit={handleSubmit}>\n      <input value={firstName} onChange={(e) => setFirstName(e.target.value)} />\n      {errors.firstName && <span>{errors.firstName}</span>}\n      {/* ...repeated for every field */}\n    </form>\n  );\n}"
+          },
+          "correct": {
+            "lang": "tsx",
+            "code": "// ✅ Declarative registration, built-in validation, minimal re-renders\nimport { useForm } from 'react-hook-form';\n\ninterface RegistrationValues {\n  firstName: string;\n  lastName: string;\n  email: string;\n  password: string;\n  confirmPassword: string;\n}\n\nfunction RegistrationForm() {\n  const {\n    register,\n    handleSubmit,\n    formState: { errors },\n    watch,\n  } = useForm<RegistrationValues>();\n\n  const onSubmit = (data: RegistrationValues) => {\n    console.log('Submitting:', data);\n  };\n\n  return (\n    <form onSubmit={handleSubmit(onSubmit)}>\n      <input {...register('firstName', { required: 'First name is required' })} />\n      {errors.firstName && <span>{errors.firstName.message}</span>}\n\n      <input {...register('email', { required: true, pattern: /^\\S+@\\S+$/i })} />\n      {errors.email && <span>Invalid email</span>}\n\n      <input\n        type=\"password\"\n        {...register('password', { required: true, minLength: 8 })}\n      />\n      {errors.password && <span>Min 8 characters</span>}\n\n      <input\n        type=\"password\"\n        {...register('confirmPassword', {\n          validate: (val) => val === watch('password') || 'Passwords must match',\n        })}\n      />\n      {errors.confirmPassword && <span>{errors.confirmPassword.message}</span>}\n\n      <button type=\"submit\">Register</button>\n    </form>\n  );\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "frontend-frameworks-best-practices",
+      "rule": "form-validation-schema",
+      "title": "Define validation schemas separately from components using Zod or Yup",
+      "impact": "MEDIUM",
+      "tags": [
+        "react",
+        "vue",
+        "forms",
+        "validation",
+        "zod",
+        "yup",
+        "schema"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "tsx",
+            "code": "// ❌ Validation logic is buried inside the component – untestable and non-reusable\nimport { useForm } from 'react-hook-form';\n\nfunction CheckoutForm() {\n  const { register, handleSubmit, setError } = useForm();\n\n  const onSubmit = (data: any) => {\n    if (!data.email || !/^\\S+@\\S+$/i.test(data.email)) {\n      setError('email', { message: 'Valid email is required' });\n      return;\n    }\n    if (!data.cardNumber || data.cardNumber.replace(/\\s/g, '').length !== 16) {\n      setError('cardNumber', { message: 'Card number must be 16 digits' });\n      return;\n    }\n    if (!data.expiry || !/^\\d{2}\\/\\d{2}$/.test(data.expiry)) {\n      setError('expiry', { message: 'Expiry must be MM/YY' });\n      return;\n    }\n    // ...more ad-hoc checks\n    submitOrder(data);\n  };\n\n  return (\n    <form onSubmit={handleSubmit(onSubmit)}>\n      <input {...register('email')} placeholder=\"Email\" />\n      <input {...register('cardNumber')} placeholder=\"Card number\" />\n      <input {...register('expiry')} placeholder=\"MM/YY\" />\n      <button type=\"submit\">Pay</button>\n    </form>\n  );\n}"
+          },
+          "correct": {
+            "lang": "tsx",
+            "code": "// ✅ Schema is standalone, testable, and infers the form's TypeScript type\nimport { z } from 'zod';\nimport { useForm } from 'react-hook-form';\nimport { zodResolver } from '@hookform/resolvers/zod';\n\nexport const checkoutSchema = z.object({\n  email: z.string().email('Valid email is required'),\n  cardNumber: z\n    .string()\n    .transform((v) => v.replace(/\\s/g, ''))\n    .pipe(z.string().length(16, 'Card number must be 16 digits')),\n  expiry: z.string().regex(/^\\d{2}\\/\\d{2}$/, 'Expiry must be MM/YY'),\n});\n\nexport type CheckoutValues = z.infer<typeof checkoutSchema>;\n\nfunction CheckoutForm() {\n  const {\n    register,\n    handleSubmit,\n    formState: { errors },\n  } = useForm<CheckoutValues>({\n    resolver: zodResolver(checkoutSchema),\n  });\n\n  const onSubmit = (data: CheckoutValues) => {\n    submitOrder(data);\n  };\n\n  return (\n    <form onSubmit={handleSubmit(onSubmit)}>\n      <input {...register('email')} placeholder=\"Email\" />\n      {errors.email && <span>{errors.email.message}</span>}\n\n      <input {...register('cardNumber')} placeholder=\"Card number\" />\n      {errors.cardNumber && <span>{errors.cardNumber.message}</span>}\n\n      <input {...register('expiry')} placeholder=\"MM/YY\" />\n      {errors.expiry && <span>{errors.expiry.message}</span>}\n\n      <button type=\"submit\">Pay</button>\n    </form>\n  );\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "frontend-frameworks-best-practices",
+      "rule": "perf-lazy-loading",
+      "title": "Lazy-load routes and heavy components to reduce initial bundle size",
+      "impact": "HIGH",
+      "tags": [
+        "react",
+        "vue",
+        "performance",
+        "lazy-loading",
+        "code-splitting",
+        "dynamic-import"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "tsx",
+            "code": "// ❌ Every page is bundled into one massive chunk, even if the user never visits most of them\nimport { BrowserRouter, Routes, Route } from \"react-router-dom\";\nimport HomePage from \"./pages/HomePage\";\nimport Dashboard from \"./pages/Dashboard\";\nimport AnalyticsReport from \"./pages/AnalyticsReport\";\nimport UserSettings from \"./pages/UserSettings\";\nimport AdminPanel from \"./pages/AdminPanel\";\n\nexport default function AppRouter() {\n  return (\n    <BrowserRouter>\n      <Routes>\n        <Route path=\"/\" element={<HomePage />} />\n        <Route path=\"/dashboard\" element={<Dashboard />} />\n        <Route path=\"/analytics\" element={<AnalyticsReport />} />\n        <Route path=\"/settings\" element={<UserSettings />} />\n        <Route path=\"/admin\" element={<AdminPanel />} />\n      </Routes>\n    </BrowserRouter>\n  );\n}"
+          },
+          "correct": {
+            "lang": "tsx",
+            "code": "// ✅ Each page is code-split into its own chunk and loaded on demand\nimport { lazy, Suspense } from \"react\";\nimport { BrowserRouter, Routes, Route } from \"react-router-dom\";\nimport LoadingSpinner from \"./components/LoadingSpinner\";\n\nconst HomePage = lazy(() => import(\"./pages/HomePage\"));\nconst Dashboard = lazy(() => import(\"./pages/Dashboard\"));\nconst AnalyticsReport = lazy(() => import(\"./pages/AnalyticsReport\"));\nconst UserSettings = lazy(() => import(\"./pages/UserSettings\"));\nconst AdminPanel = lazy(() => import(\"./pages/AdminPanel\"));\n\nexport default function AppRouter() {\n  return (\n    <BrowserRouter>\n      <Suspense fallback={<LoadingSpinner />}>\n        <Routes>\n          <Route path=\"/\" element={<HomePage />} />\n          <Route path=\"/dashboard\" element={<Dashboard />} />\n          <Route path=\"/analytics\" element={<AnalyticsReport />} />\n          <Route path=\"/settings\" element={<UserSettings />} />\n          <Route path=\"/admin\" element={<AdminPanel />} />\n        </Routes>\n      </Suspense>\n    </BrowserRouter>\n  );\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "frontend-frameworks-best-practices",
       "rule": "perf-memoize-renders",
       "title": "Memoize expensive computations and components",
       "impact": "MEDIUM",
@@ -85,6 +343,84 @@
     },
     {
       "skill": "frontend-frameworks-best-practices",
+      "rule": "perf-virtualize-lists",
+      "title": "Virtualize long lists instead of rendering all items to the DOM",
+      "impact": "MEDIUM",
+      "tags": [
+        "react",
+        "vue",
+        "performance",
+        "virtualization",
+        "lists",
+        "dom"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "tsx",
+            "code": "// ❌ All 1,000 rows are mounted to the DOM at once, causing jank and high memory usage\ninterface Transaction {\n  id: string;\n  date: string;\n  amount: number;\n  description: string;\n}\n\nfunction TransactionList({ transactions }: { transactions: Transaction[] }) {\n  return (\n    <div className=\"h-[600px] overflow-auto\">\n      {transactions.map((tx) => (\n        <div key={tx.id} className=\"flex items-center justify-between border-b px-4 py-3\">\n          <div>\n            <p className=\"font-medium\">{tx.description}</p>\n            <p className=\"text-sm text-gray-500\">{tx.date}</p>\n          </div>\n          <span className=\"font-semibold\">${tx.amount.toFixed(2)}</span>\n        </div>\n      ))}\n    </div>\n  );\n}"
+          },
+          "correct": {
+            "lang": "tsx",
+            "code": "// ✅ Only visible rows are rendered — smooth scrolling even with 10,000+ items\nimport { useRef } from \"react\";\nimport { useVirtualizer } from \"@tanstack/react-virtual\";\n\ninterface Transaction {\n  id: string;\n  date: string;\n  amount: number;\n  description: string;\n}\n\nfunction TransactionList({ transactions }: { transactions: Transaction[] }) {\n  const parentRef = useRef<HTMLDivElement>(null);\n\n  const virtualizer = useVirtualizer({\n    count: transactions.length,\n    getScrollElement: () => parentRef.current,\n    estimateSize: () => 56,\n  });\n\n  return (\n    <div ref={parentRef} className=\"h-[600px] overflow-auto\">\n      <div className=\"relative\" style={{ height: virtualizer.getTotalSize() }}>\n        {virtualizer.getVirtualItems().map((virtualRow) => {\n          const tx = transactions[virtualRow.index];\n          return (\n            <div\n              key={tx.id}\n              className=\"absolute left-0 right-0 flex items-center justify-between border-b px-4 py-3\"\n              style={{ top: virtualRow.start, height: virtualRow.size }}\n            >\n              <div>\n                <p className=\"font-medium\">{tx.description}</p>\n                <p className=\"text-sm text-gray-500\">{tx.date}</p>\n              </div>\n              <span className=\"font-semibold\">${tx.amount.toFixed(2)}</span>\n            </div>\n          );\n        })}\n      </div>\n    </div>\n  );\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "frontend-frameworks-best-practices",
+      "rule": "state-colocation",
+      "title": "Colocate state with the components that use it",
+      "impact": "HIGH",
+      "tags": [
+        "react",
+        "vue",
+        "state",
+        "colocation",
+        "local-state",
+        "architecture"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "tsx",
+            "code": "// ❌ Search query is only used by ProductSearch, but stored globally\n// store/productStore.ts\nimport { create } from \"zustand\";\n\ninterface ProductStore {\n  searchQuery: string;\n  setSearchQuery: (query: string) => void;\n  selectedCategory: string;\n  setSelectedCategory: (cat: string) => void;\n  cartItems: CartItem[];\n  addToCart: (item: CartItem) => void;\n}\n\nexport const useProductStore = create<ProductStore>((set) => ({\n  searchQuery: \"\",\n  setSearchQuery: (query) => set({ searchQuery: query }),\n  selectedCategory: \"all\",\n  setSelectedCategory: (cat) => set({ selectedCategory: cat }),\n  cartItems: [],\n  addToCart: (item) => set((s) => ({ cartItems: [...s.cartItems, item] })),\n}));\n\n// components/ProductSearch.tsx — the ONLY consumer of searchQuery\nfunction ProductSearch() {\n  const searchQuery = useProductStore((s) => s.searchQuery);\n  const setSearchQuery = useProductStore((s) => s.setSearchQuery);\n\n  return (\n    <input\n      value={searchQuery}\n      onChange={(e) => setSearchQuery(e.target.value)}\n      placeholder=\"Search products…\"\n    />\n  );\n}"
+          },
+          "correct": {
+            "lang": "tsx",
+            "code": "// ✅ searchQuery lives where it's used — the global store only keeps shared data\n// store/productStore.ts\nimport { create } from \"zustand\";\n\ninterface ProductStore {\n  cartItems: CartItem[];\n  addToCart: (item: CartItem) => void;\n}\n\nexport const useProductStore = create<ProductStore>((set) => ({\n  cartItems: [],\n  addToCart: (item) => set((s) => ({ cartItems: [...s.cartItems, item] })),\n}));\n\n// components/ProductSearch.tsx — owns its own transient UI state\nfunction ProductSearch({ onSearch }: { onSearch: (query: string) => void }) {\n  const [searchQuery, setSearchQuery] = useState(\"\");\n\n  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {\n    setSearchQuery(e.target.value);\n    onSearch(e.target.value);\n  };\n\n  return (\n    <input\n      value={searchQuery}\n      onChange={handleChange}\n      placeholder=\"Search products…\"\n    />\n  );\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "frontend-frameworks-best-practices",
+      "rule": "state-derived-values",
+      "title": "Derive values from state instead of storing redundant copies",
+      "impact": "MEDIUM",
+      "tags": [
+        "react",
+        "vue",
+        "state",
+        "derived",
+        "computed",
+        "redundant-state"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "tsx",
+            "code": "// ❌ filteredProducts and productCount are copies of data already in products + filter\nfunction ProductCatalog() {\n  const [products, setProducts] = useState<Product[]>([]);\n  const [filter, setFilter] = useState(\"\");\n  const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);\n  const [productCount, setProductCount] = useState(0);\n\n  useEffect(() => {\n    fetchProducts().then((data) => {\n      setProducts(data);\n      // Must remember to update BOTH derived values here…\n      const filtered = data.filter((p) => p.name.toLowerCase().includes(filter));\n      setFilteredProducts(filtered);\n      setProductCount(filtered.length);\n    });\n  }, []);\n\n  const handleFilterChange = (e: React.ChangeEvent<HTMLInputElement>) => {\n    const value = e.target.value.toLowerCase();\n    setFilter(value);\n    // …and here — forget one and the UI is out of sync\n    const filtered = products.filter((p) => p.name.toLowerCase().includes(value));\n    setFilteredProducts(filtered);\n    setProductCount(filtered.length);\n  };\n\n  return (\n    <div>\n      <input value={filter} onChange={handleFilterChange} placeholder=\"Filter…\" />\n      <p>Showing {productCount} products</p>\n      <ProductGrid products={filteredProducts} />\n    </div>\n  );\n}"
+          },
+          "correct": {
+            "lang": "tsx",
+            "code": "// ✅ Only store the raw data and the filter — derive everything else\nfunction ProductCatalog() {\n  const [products, setProducts] = useState<Product[]>([]);\n  const [filter, setFilter] = useState(\"\");\n\n  useEffect(() => {\n    fetchProducts().then(setProducts);\n  }, []);\n\n  const filteredProducts = useMemo(\n    () => products.filter((p) => p.name.toLowerCase().includes(filter.toLowerCase())),\n    [products, filter],\n  );\n\n  const productCount = filteredProducts.length;\n\n  return (\n    <div>\n      <input\n        value={filter}\n        onChange={(e) => setFilter(e.target.value)}\n        placeholder=\"Filter…\"\n      />\n      <p>Showing {productCount} products</p>\n      <ProductGrid products={filteredProducts} />\n    </div>\n  );\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "frontend-frameworks-best-practices",
       "rule": "state-lift-state",
       "title": "Lift state up or use global stores instead of prop drilling",
       "impact": "HIGH",
@@ -105,6 +441,84 @@
           "correct": {
             "lang": "jsx",
             "code": "// ✅ Using a lightweight global store (e.g., Zustand for React)\nimport { create } from 'zustand';\n\nconst useThemeStore = create((set) => ({\n  theme: 'dark',\n  toggleTheme: () => set((state) => ({ theme: state.theme === 'dark' ? 'light' : 'dark' })),\n}));\n\nfunction App() {\n  return <Layout />;\n}\n\nfunction Layout() {\n  // Clean! No props passed down.\n  return <Header />;\n}\n\nfunction Header() {\n  return <ThemeToggle />;\n}\n\nfunction ThemeToggle() {\n  // ✅ Only the component that needs the state accesses it\n  const { theme, toggleTheme } = useThemeStore();\n  \n  return (\n    <button onClick={toggleTheme}>\n      Current theme: {theme}\n    </button>\n  );\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "frontend-frameworks-best-practices",
+      "rule": "test-user-behavior",
+      "title": "Test user behavior, not implementation details",
+      "impact": "MEDIUM",
+      "tags": [
+        "react",
+        "vue",
+        "testing",
+        "testing-library",
+        "user-behavior",
+        "unit-tests"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "tsx",
+            "code": "// ❌ Test is coupled to implementation – breaks on any refactor\nimport { mount } from 'enzyme';\nimport Dropdown from './Dropdown';\n\ntest('opens the dropdown when clicked', () => {\n  const wrapper = mount(<Dropdown items={['Apple', 'Banana', 'Cherry']} />);\n\n  // Reaching into internal state\n  expect(wrapper.state('isOpen')).toBe(false);\n\n  wrapper.find('.dropdown-toggle').simulate('click');\n\n  // Asserting on CSS class and internal state\n  expect(wrapper.state('isOpen')).toBe(true);\n  expect(wrapper.find('.dropdown-menu').exists()).toBe(true);\n  expect(wrapper.find('.dropdown-menu').hasClass('is-visible')).toBe(true);\n});"
+          },
+          "correct": {
+            "lang": "tsx",
+            "code": "// ✅ Test mirrors real user interaction – survives refactors\nimport { render, screen } from '@testing-library/react';\nimport userEvent from '@testing-library/user-event';\nimport Dropdown from './Dropdown';\n\ntest('shows options when the user opens the dropdown', async () => {\n  const user = userEvent.setup();\n  render(<Dropdown items={['Apple', 'Banana', 'Cherry']} />);\n\n  // The listbox should not be visible initially\n  expect(screen.queryByRole('listbox')).not.toBeInTheDocument();\n\n  // Click the toggle button by its accessible role\n  await user.click(screen.getByRole('button', { name: /select an option/i }));\n\n  // Assert that the user can see the options\n  const listbox = screen.getByRole('listbox');\n  expect(listbox).toBeVisible();\n  expect(screen.getByRole('option', { name: 'Apple' })).toBeVisible();\n  expect(screen.getByRole('option', { name: 'Cherry' })).toBeVisible();\n});"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "frontend-frameworks-best-practices",
+      "rule": "ts-discriminated-unions",
+      "title": "Use discriminated unions for component variants instead of boolean props",
+      "impact": "MEDIUM",
+      "tags": [
+        "typescript",
+        "react",
+        "vue",
+        "discriminated-union",
+        "variants",
+        "type-safety"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "tsx",
+            "code": "// ❌ Nothing prevents <Button isPrimary isDanger /> – an impossible state\ninterface ButtonProps {\n  children: React.ReactNode;\n  isPrimary?: boolean;\n  isSecondary?: boolean;\n  isDanger?: boolean;\n  onClick: () => void;\n}\n\nfunction Button({ children, isPrimary, isSecondary, isDanger, onClick }: ButtonProps) {\n  const className = isPrimary\n    ? 'btn-primary'\n    : isSecondary\n      ? 'btn-secondary'\n      : isDanger\n        ? 'btn-danger'\n        : 'btn-default';\n\n  return (\n    <button className={className} onClick={onClick}>\n      {children}\n    </button>\n  );\n}"
+          },
+          "correct": {
+            "lang": "tsx",
+            "code": "// ✅ Only one variant is allowed at a time – impossible states are unrepresentable\ninterface ButtonProps {\n  children: React.ReactNode;\n  variant: 'primary' | 'secondary' | 'danger';\n  onClick: () => void;\n}\n\nconst variantClassMap: Record<ButtonProps['variant'], string> = {\n  primary: 'btn-primary',\n  secondary: 'btn-secondary',\n  danger: 'btn-danger',\n};\n\nfunction Button({ children, variant, onClick }: ButtonProps) {\n  return (\n    <button className={variantClassMap[variant]} onClick={onClick}>\n      {children}\n    </button>\n  );\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "frontend-frameworks-best-practices",
+      "rule": "ts-strict-props",
+      "title": "Define explicit TypeScript interfaces for all component props",
+      "impact": "HIGH",
+      "tags": [
+        "typescript",
+        "react",
+        "vue",
+        "props",
+        "type-safety",
+        "interfaces"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "tsx",
+            "code": "// ❌ Props typed as `any` – no compile-time safety, no autocompletion\nfunction Card({ title, items, onSelect }: any) {\n  return (\n    <div className=\"card\">\n      <h2>{title}</h2>\n      <ul>\n        {items.map((item: any) => (\n          <li key={item.id} onClick={() => onSelect(item)}>\n            {item.label}\n          </li>\n        ))}\n      </ul>\n    </div>\n  );\n}\n\nexport default Card;"
+          },
+          "correct": {
+            "lang": "tsx",
+            "code": "// ✅ Explicit interface makes the component API discoverable and type-safe\nexport interface CardItem {\n  id: string;\n  label: string;\n}\n\nexport interface CardProps {\n  title: string;\n  items: CardItem[];\n  onSelect: (item: CardItem) => void;\n}\n\nfunction Card({ title, items, onSelect }: CardProps) {\n  return (\n    <div className=\"card\">\n      <h2>{title}</h2>\n      <ul>\n        {items.map((item) => (\n          <li key={item.id} onClick={() => onSelect(item)}>\n            {item.label}\n          </li>\n        ))}\n      </ul>\n    </div>\n  );\n}\n\nexport default Card;"
           }
         }
       ]

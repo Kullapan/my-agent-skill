@@ -12,7 +12,8 @@
 
 ## 1. Architecture & DTOs {#section-1}
 
-**Impact:** UNKNOWN
+**Impact:** CRITICAL
+**Description:** Clean architecture demands strict boundaries between the web layer and the persistence layer. DTOs (Data Transfer Objects) must be used for all API inputs and outputs. Modern Java (17+) provides Records, which are perfect for this.
 
 ## Centralize exception handling with @RestControllerAdvice
 
@@ -142,7 +143,8 @@ Jackson (the default JSON mapper in Spring Boot) supports deserializing directly
 
 ## 2. Data Access & JPA {#section-2}
 
-**Impact:** UNKNOWN
+**Impact:** HIGH
+**Description:** Exposing JPA entities directly via REST endpoints leads to mass assignment vulnerabilities and leaked data. Always map entities to DTOs before responding.
 
 ## Prevent entity exposure using DTO mapping
 
@@ -228,7 +230,8 @@ For complex projects, use `MapStruct` to generate mapping code at compile-time a
 
 ## 3. RESTful Constraints {#section-3}
 
-**Impact:** UNKNOWN
+**Impact:** HIGH
+**Description:** APIs must adhere to HTTP semantics. Use correct methods (GET, POST, PUT, DELETE) and return standard status codes (200, 201, 404). Collections should always be paginated.
 
 ## Implement proper pagination for collection endpoints
 

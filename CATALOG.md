@@ -1,8 +1,8 @@
 # Skill Catalog
 
-> **Auto-generated** on Sun, 14 Jun 2026 07:05:22 GMT. Do not edit manually — run `npm run catalog` to regenerate.
+> **Auto-generated** on Sun, 14 Jun 2026 09:12:18 GMT. Do not edit manually — run `npm run catalog` to regenerate.
 
-**7 skill(s)** · **133 total rules**
+**7 skill(s)** · **190 total rules**
 
 ---
 
@@ -10,13 +10,13 @@
 
 | Skill | Description | Rules | Version | License |
 |-------|-------------|-------|---------|---------|
-| [frontend-frameworks-best-practices](./frontend-frameworks-best-practices/) | Best practices for modern component-based frontend development using React or... | 4 | 1.0.0 | MIT |
+| [frontend-frameworks-best-practices](./frontend-frameworks-best-practices/) | Best practices for modern component-based frontend development using React or... | 20 | 2.0.0 | MIT |
 | [java-restful-best-practices](./java-restful-best-practices/) | Best practices for building modern, scalable REST APIs using Java and Spring ... | 5 | 1.0.0 | MIT |
 | [kotlin-restful-best-practices](./kotlin-restful-best-practices/) | Best practices for building standard Spring Web MVC REST APIs using Kotlin. F... | 5 | 1.0.0 | MIT |
-| [kotlin-webflux-best-practices](./kotlin-webflux-best-practices/) | Best practices for building highly scalable, non-blocking APIs using Kotlin a... | 6 | 1.0.0 | MIT |
-| [openshift-docker-best-practices](./openshift-docker-best-practices/) | Best practices for containerization and deployment to Red Hat OpenShift. Focu... | 4 | 1.0.0 | MIT |
+| [kotlin-webflux-best-practices](./kotlin-webflux-best-practices/) | Best practices for building highly scalable, non-blocking APIs using Kotlin a... | 20 | 2.0.0 | MIT |
+| [openshift-docker-best-practices](./openshift-docker-best-practices/) | Best practices for containerization and deployment to Red Hat OpenShift and K... | 20 | 2.0.0 | MIT |
 | [vercel-react-best-practices](./react-best-practices/) | React and Next.js performance optimization guidelines from Vercel Engineering... | 70 | 1.0.0 | MIT |
-| [security-review-best-practices](./security-review-best-practices/) | Security review guidelines for web applications and APIs. Use this skill when... | 39 | 1.0.0 | MIT |
+| [security-review-best-practices](./security-review-best-practices/) | Static Application Security Testing (SAST) guidelines for web applications an... | 50 | 2.0.0 | MIT |
 
 ---
 
@@ -25,12 +25,12 @@
 ### frontend-frameworks-best-practices
 
 **Author:** Frontend Engineering
-**Version:** 1.0.0
+**Version:** 2.0.0
 **License:** MIT
-**Rules:** 4
-**Tags:** frontend, react, vue, tailwindcss, components, state, css
+**Rules:** 20
+**Tags:** frontend, react, vue, tailwindcss, components, state, css, accessibility, a11y, typescript, error-handling, forms, testing, performance
 
-Best practices for modern component-based frontend development using React or Vue, combined with TailwindCSS for utility-first styling. Covers component architecture, state management, and CSS organization.
+Best practices for modern component-based frontend development using React or Vue, combined with TailwindCSS for utility-first styling. Covers component architecture, state management, CSS organization, accessibility, error handling, TypeScript type safety, forms & validation, performance optimization, and testing.
 
 **Files:**
 - [SKILL.md](./frontend-frameworks-best-practices/SKILL.md) — Agent entry point
@@ -76,12 +76,12 @@ Best practices for building standard Spring Web MVC REST APIs using Kotlin. Focu
 ### kotlin-webflux-best-practices
 
 **Author:** Backend Engineering
-**Version:** 1.0.0
+**Version:** 2.0.0
 **License:** MIT
-**Rules:** 6
-**Tags:** kotlin, spring-boot, webflux, reactive, coroutines, non-blocking
+**Rules:** 20
+**Tags:** kotlin, spring-boot, webflux, reactive, coroutines, non-blocking, webclient, r2dbc, security, resilience, observability, testing
 
-Best practices for building highly scalable, non-blocking APIs using Kotlin and Spring WebFlux. Covers coroutines, functional routing, blocking I/O isolation, and reactive testing.
+Best practices for building highly scalable, non-blocking APIs using Kotlin and Spring WebFlux. Covers reactive core threading, coroutines, WebClient configuration, R2DBC data access, reactive security, error handling, resilience patterns, observability, and testing.
 
 **Files:**
 - [SKILL.md](./kotlin-webflux-best-practices/SKILL.md) — Agent entry point
@@ -93,12 +93,12 @@ Best practices for building highly scalable, non-blocking APIs using Kotlin and 
 ### openshift-docker-best-practices
 
 **Author:** Platform Engineering
-**Version:** 1.0.0
+**Version:** 2.0.0
 **License:** MIT
-**Rules:** 4
-**Tags:** docker, openshift, kubernetes, containers, security, scc, devops
+**Rules:** 20
+**Tags:** docker, openshift, kubernetes, containers, security, scc, devops, networking, deployment, secrets, cicd, supply-chain
 
-Best practices for containerization and deployment to Red Hat OpenShift. Focuses on Dockerfile optimization, SCC (Security Context Constraints) compliance, non-root users, and Kubernetes resources.
+Best practices for containerization and deployment to Red Hat OpenShift and Kubernetes. Covers Dockerfile optimization, SCC compliance, security context hardening, secrets management, networking policies, deployment strategies, resource management, and CI/CD supply chain security.
 
 **Files:**
 - [SKILL.md](./openshift-docker-best-practices/SKILL.md) — Agent entry point
@@ -126,12 +126,12 @@ React and Next.js performance optimization guidelines from Vercel Engineering. T
 ### security-review-best-practices
 
 **Author:** Security Engineering
-**Version:** 1.0.0
+**Version:** 2.0.0
 **License:** MIT
-**Rules:** 39
-**Tags:** security, owasp, authentication, authorization, injection, secrets, api, cryptography, jfrog-xray, sonarqube, semgrep, codeql, trivy, sca, sast, cve
+**Rules:** 50
+**Tags:** security, owasp, owasp-top-10, owasp-2025, sast, authentication, authorization, injection, secrets, api, cryptography, jfrog-xray, sonarqube, semgrep, codeql, trivy, sca, cve, threat-modeling
 
-Security review guidelines for web applications and APIs. Use this skill when writing, reviewing, or auditing code for security vulnerabilities — covering authentication, input validation, secrets management, API security, data protection, SCA/CVE scanning (JFrog Xray, OWASP Dependency Check, Trivy), SAST (SonarQube, Semgrep, CodeQL), and infrastructure hardening.
+Static Application Security Testing (SAST) guidelines for web applications and APIs, aligned to OWASP Top 10:2025. Use this skill when writing, reviewing, or auditing source code for security vulnerabilities — covering authentication, input validation, injection prevention, secrets management, API security, data protection, dependency analysis, error handling, infrastructure hardening, SCA/CVE scanning, SAST tooling, and secure design.
 
 **Files:**
 - [SKILL.md](./security-review-best-practices/SKILL.md) — Agent entry point

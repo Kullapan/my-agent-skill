@@ -1,8 +1,59 @@
 {
-  "generated": "2026-06-14T07:05:17.958Z",
+  "generated": "2026-06-14T09:12:11.817Z",
   "skill": "kotlin-webflux-best-practices",
-  "total": 6,
+  "total": 20,
   "testCases": [
+    {
+      "skill": "kotlin-webflux-best-practices",
+      "rule": "data-r2dbc-repository",
+      "title": "Use R2DBC for non-blocking database access instead of JDBC",
+      "impact": "HIGH",
+      "tags": [
+        "r2dbc",
+        "database",
+        "reactive",
+        "jdbc",
+        "repository",
+        "spring-data"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "kotlin",
+            "code": "// ❌ JpaRepository uses blocking JDBC under the hood\ninterface UserJpaRepository : JpaRepository<UserEntity, Long>\n\nclass UserService(private val userRepository: UserJpaRepository) {\n\n    // ❌ This suspend function blocks the event loop thread!\n    suspend fun findActiveUsers(): List<UserEntity> {\n        // JpaRepository.findAll() makes a blocking JDBC call\n        // The Netty event loop thread is blocked until the query completes\n        return userRepository.findAll().filter { it.active }\n    }\n\n    suspend fun createUser(request: CreateUserRequest): UserEntity {\n        // ❌ Blocking save on event loop thread\n        return userRepository.save(UserEntity(name = request.name, email = request.email))\n    }\n}"
+          },
+          "correct": {
+            "lang": "kotlin",
+            "code": "import org.springframework.data.repository.kotlin.CoroutineCrudRepository\nimport org.springframework.data.relational.core.mapping.Table\nimport org.springframework.data.annotation.Id\nimport kotlinx.coroutines.flow.Flow\nimport kotlinx.coroutines.flow.filter\n\n// ✅ R2DBC entity with Spring Data annotations\n@Table(\"users\")\ndata class UserEntity(\n    @Id val id: Long? = null,\n    val name: String,\n    val email: String,\n    val active: Boolean = true\n)\n\n// ✅ CoroutineCrudRepository — all operations are non-blocking suspend functions\ninterface UserRepository : CoroutineCrudRepository<UserEntity, Long> {\n    fun findByActive(active: Boolean): Flow<UserEntity>\n    suspend fun findByEmail(email: String): UserEntity?\n}\n\nclass UserService(private val userRepository: UserRepository) {\n\n    // ✅ Returns Flow<UserEntity> — fully non-blocking, streaming results\n    fun findActiveUsers(): Flow<UserEntity> {\n        return userRepository.findByActive(active = true)\n    }\n\n    // ✅ Suspend function backed by R2DBC — non-blocking database access\n    suspend fun createUser(request: CreateUserRequest): UserEntity {\n        return userRepository.save(\n            UserEntity(name = request.name, email = request.email)\n        )\n    }\n\n    // ✅ Suspend function for single-result queries\n    suspend fun findByEmail(email: String): UserEntity? {\n        return userRepository.findByEmail(email)\n    }\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "kotlin-webflux-best-practices",
+      "rule": "data-transaction-management",
+      "title": "Use reactive transaction management with R2DBC",
+      "impact": "HIGH",
+      "tags": [
+        "r2dbc",
+        "transactions",
+        "reactive",
+        "spring-data",
+        "transactional"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "kotlin",
+            "code": "// ❌ Blocking transaction management — stalls the event loop\nclass OrderService(\n    private val transactionTemplate: TransactionTemplate,\n    private val orderRepo: OrderJpaRepository,\n    private val inventoryRepo: InventoryJpaRepository\n) {\n    suspend fun placeOrder(request: OrderRequest): Order {\n        // ❌ TransactionTemplate.execute blocks the calling thread\n        return transactionTemplate.execute { status ->\n            val order = orderRepo.save(Order(item = request.item, qty = request.qty))\n            inventoryRepo.decrementStock(request.item, request.qty)\n            order\n        }!!\n    }\n}"
+          },
+          "correct": {
+            "lang": "kotlin",
+            "code": "import org.springframework.transaction.annotation.Transactional\nimport org.springframework.transaction.reactive.TransactionalOperator\nimport org.springframework.transaction.reactive.executeAndAwait\nimport org.springframework.data.repository.kotlin.CoroutineCrudRepository\nimport kotlinx.coroutines.reactive.awaitSingle\n\ninterface OrderRepository : CoroutineCrudRepository<Order, Long>\ninterface InventoryRepository : CoroutineCrudRepository<Inventory, Long> {\n    suspend fun findByItemId(itemId: String): Inventory?\n}\n\n// ✅ Option 1: Declarative @Transactional on suspend functions\nclass OrderService(\n    private val orderRepo: OrderRepository,\n    private val inventoryRepo: InventoryRepository,\n    private val transactionalOperator: TransactionalOperator\n) {\n    // ✅ @Transactional works on suspend functions with R2dbcTransactionManager\n    @Transactional\n    suspend fun placeOrder(request: OrderRequest): Order {\n        val order = orderRepo.save(Order(item = request.item, qty = request.qty))\n        val inventory = inventoryRepo.findByItemId(request.item)\n            ?: throw ItemNotFoundException(\"Item ${request.item} not found\")\n        inventoryRepo.save(inventory.copy(stock = inventory.stock - request.qty))\n        return order\n    }\n\n    // ✅ Option 2: Programmatic transactions with TransactionalOperator\n    suspend fun placeOrderProgrammatic(request: OrderRequest): Order {\n        return transactionalOperator.executeAndAwait { tx ->\n            val order = orderRepo.save(Order(item = request.item, qty = request.qty))\n            val inventory = inventoryRepo.findByItemId(request.item)\n            if (inventory == null || inventory.stock < request.qty) {\n                tx.setRollbackOnly()\n                throw InsufficientStockException(\"Not enough stock for ${request.item}\")\n            }\n            inventoryRepo.save(inventory.copy(stock = inventory.stock - request.qty))\n            order\n        }\n    }\n}"
+          }
+        }
+      ]
+    },
     {
       "skill": "kotlin-webflux-best-practices",
       "rule": "error-global-handling",
@@ -23,6 +74,83 @@
           "correct": {
             "lang": "kotlin",
             "code": "import org.springframework.boot.autoconfigure.web.WebProperties\nimport org.springframework.boot.autoconfigure.web.reactive.error.AbstractErrorWebExceptionHandler\nimport org.springframework.boot.web.reactive.error.ErrorAttributes\nimport org.springframework.context.ApplicationContext\nimport org.springframework.core.annotation.Order\nimport org.springframework.http.HttpStatus\nimport org.springframework.http.codec.ServerCodecConfigurer\nimport org.springframework.stereotype.Component\nimport org.springframework.web.reactive.function.server.*\n\n// ✅ Catches all errors globally across functional routes and filters\n@Component\n@Order(-2) // Give it priority over the DefaultErrorWebExceptionHandler\nclass GlobalErrorHandler(\n    errorAttributes: ErrorAttributes,\n    applicationContext: ApplicationContext,\n    serverCodecConfigurer: ServerCodecConfigurer\n) : AbstractErrorWebExceptionHandler(\n    errorAttributes,\n    WebProperties.Resources(),\n    applicationContext\n) {\n    init {\n        super.setMessageWriters(serverCodecConfigurer.writers)\n        super.setMessageReaders(serverCodecConfigurer.readers)\n    }\n\n    override fun getRoutingFunction(errorAttributes: ErrorAttributes): RouterFunction<ServerResponse> {\n        return coRouter {\n            all { request -> renderErrorResponse(request) }\n        }\n    }\n\n    private suspend fun renderErrorResponse(request: ServerRequest): ServerResponse {\n        val error = getError(request)\n        \n        val status = when (error) {\n            is NotFoundException -> HttpStatus.NOT_FOUND\n            is IllegalArgumentException -> HttpStatus.BAD_REQUEST\n            else -> HttpStatus.INTERNAL_SERVER_ERROR\n        }\n\n        return ServerResponse.status(status)\n            .bodyValueAndAwait(mapOf(\"error\" to error.message))\n    }\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "kotlin-webflux-best-practices",
+      "rule": "error-resilience-patterns",
+      "title": "Apply circuit breaker and retry patterns for downstream calls",
+      "impact": "HIGH",
+      "tags": [
+        "resilience4j",
+        "circuit-breaker",
+        "retry",
+        "webflux",
+        "fault-tolerance"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "kotlin",
+            "code": "// ❌ No error handling — failures cascade to callers, no retry, no circuit breaker\nclass PaymentClient(private val webClient: WebClient) {\n\n    suspend fun chargePayment(request: PaymentRequest): PaymentResponse {\n        // If payment-service is down, this hangs until TCP timeout (30s+)\n        // Every request queues up, exhausting connection pool and memory\n        return webClient.post()\n            .uri(\"/api/payments/charge\")\n            .bodyValue(request)\n            .retrieve()\n            .awaitBody<PaymentResponse>()\n    }\n}"
+          },
+          "correct": {
+            "lang": "kotlin",
+            "code": "import io.github.resilience4j.circuitbreaker.CircuitBreaker\nimport io.github.resilience4j.circuitbreaker.CircuitBreakerConfig\nimport io.github.resilience4j.reactor.retry.RetryOperator\nimport io.github.resilience4j.reactor.circuitbreaker.operator.CircuitBreakerOperator\nimport reactor.util.retry.Retry\nimport java.time.Duration\n\n// ✅ Configure circuit breaker and retry with proper limits\nclass PaymentClient(private val webClient: WebClient) {\n\n    private val circuitBreaker = CircuitBreaker.of(\"payment-service\",\n        CircuitBreakerConfig.custom()\n            .failureRateThreshold(50f)\n            .waitDurationInOpenState(Duration.ofSeconds(30))\n            .slidingWindowSize(10)\n            .build()\n    )\n\n    private val retrySpec = Retry.backoff(3, Duration.ofMillis(500))\n        .maxBackoff(Duration.ofSeconds(5))\n        .filter { it is ServiceUnavailableException || it is java.net.ConnectException }\n        .doBeforeRetry { signal ->\n            logger.warn(\"Retrying payment call, attempt {}\", signal.totalRetries() + 1)\n        }\n\n    suspend fun chargePayment(request: PaymentRequest): PaymentResponse {\n        return webClient.post()\n            .uri(\"/api/payments/charge\")\n            .bodyValue(request)\n            .retrieve()\n            .bodyToMono(PaymentResponse::class.java)\n            .transform(CircuitBreakerOperator.of(circuitBreaker))\n            .retryWhen(retrySpec)\n            .timeout(Duration.ofSeconds(10))\n            .awaitSingle()\n    }\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "kotlin-webflux-best-practices",
+      "rule": "observe-context-propagation",
+      "title": "Configure context propagation for distributed tracing across reactive boundaries",
+      "impact": "MEDIUM",
+      "tags": [
+        "observability",
+        "tracing",
+        "micrometer",
+        "context-propagation",
+        "mdc",
+        "opentelemetry"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "kotlin",
+            "code": "// ❌ MDC values are lost after reactive operators switch threads\nclass OrderHandler(private val orderService: OrderService) {\n\n    suspend fun createOrder(request: ServerRequest): ServerResponse {\n        MDC.put(\"requestId\", request.headers().firstHeader(\"X-Request-ID\"))\n\n        // After this suspend point, MDC is empty — execution resumes on a different thread\n        val order = orderService.createOrder(request.awaitBody())\n\n        // ❌ MDC.get(\"requestId\") returns null here!\n        logger.info(\"Order created: ${order.id}\") // Log has no requestId\n        return ServerResponse.ok().bodyValueAndAwait(order)\n    }\n}\n\n// Logs show: \"Order created: 42\" — no trace ID, no request ID\n// Impossible to correlate with upstream/downstream service logs"
+          },
+          "correct": {
+            "lang": "kotlin",
+            "code": "import io.micrometer.context.ContextRegistry\nimport org.slf4j.MDC\nimport reactor.core.publisher.Hooks\nimport kotlinx.coroutines.reactor.ReactorContext\nimport kotlinx.coroutines.slf4j.MDCContext\nimport org.springframework.boot.autoconfigure.SpringBootApplication\nimport org.springframework.context.annotation.Bean\nimport org.springframework.context.annotation.Configuration\n\n// ✅ Step 1: Enable automatic context propagation at application startup\n@Configuration\nclass ObservabilityConfig {\n\n    @Bean\n    fun contextPropagationInitializer(): Unit {\n        // Enables automatic propagation of context across reactive operators\n        Hooks.enableAutomaticContextPropagation()\n        return Unit\n    }\n}\n\n// ✅ Step 2: Use MDCContext in coroutines to preserve log context\nclass OrderHandler(private val orderService: OrderService) {\n\n    suspend fun createOrder(request: ServerRequest): ServerResponse {\n        val requestId = request.headers().firstHeader(\"X-Request-ID\") ?: \"unknown\"\n\n        // ✅ MDCContext propagates MDC values across suspension points\n        return withContext(MDCContext(mapOf(\"requestId\" to requestId))) {\n            val order = orderService.createOrder(request.awaitBody())\n\n            // ✅ MDC.get(\"requestId\") is available here!\n            logger.info(\"Order created: ${order.id}\")\n            ServerResponse.ok().bodyValueAndAwait(order)\n        }\n    }\n}\n\n// ✅ Step 3: Configure logback pattern to include trace context\n// In logback-spring.xml:\n// <pattern>%d{ISO8601} [%thread] [traceId=%X{traceId}] [requestId=%X{requestId}] %-5level %logger - %msg%n</pattern>\n\n// Required dependencies in build.gradle.kts:\n// implementation(\"io.micrometer:context-propagation:1.1.1\")\n// implementation(\"org.jetbrains.kotlinx:kotlinx-coroutines-slf4j:1.8.0\")\n// implementation(\"io.micrometer:micrometer-tracing-bridge-otel\")  // For OpenTelemetry"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "kotlin-webflux-best-practices",
+      "rule": "reactive-backpressure",
+      "title": "Handle backpressure explicitly for high-throughput reactive streams",
+      "impact": "HIGH",
+      "tags": [
+        "reactive",
+        "backpressure",
+        "flow",
+        "flux",
+        "buffer",
+        "drop"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "kotlin",
+            "code": "// ❌ No backpressure strategy — unbounded buffer grows until OOM\nfun streamEvents(): Flux<Event> {\n    return Flux.create<Event> { sink ->\n        eventSource.onEvent { event ->\n            sink.next(event) // Emits as fast as possible\n        }\n    }\n    // No backpressure handling — if the subscriber is slow,\n    // items queue up in an unbounded internal buffer\n}\n\nfun consumeEvents() {\n    streamEvents()\n        .subscribe { event ->\n            // Slow processing — 100ms per event\n            Thread.sleep(100)\n            processEvent(event)\n        }\n}"
+          },
+          "correct": {
+            "lang": "kotlin",
+            "code": "import reactor.core.publisher.Flux\nimport reactor.core.publisher.BufferOverflowStrategy\nimport kotlinx.coroutines.flow.Flow\nimport kotlinx.coroutines.flow.buffer\nimport org.slf4j.LoggerFactory\n\nprivate val logger = LoggerFactory.getLogger(\"BackpressureExample\")\n\n// ✅ Flux: Use onBackpressureBuffer with a max size and overflow strategy\nfun streamEvents(): Flux<Event> {\n    return Flux.create<Event> { sink ->\n        eventSource.onEvent { event ->\n            sink.next(event)\n        }\n    }\n    .onBackpressureBuffer(1024, { droppedEvent ->\n        logger.warn(\"Backpressure: dropped event id={}\", droppedEvent.id)\n    }, BufferOverflowStrategy.DROP_OLDEST)\n}\n\n// ✅ Alternative: Use onBackpressureDrop for fire-and-forget scenarios\nfun streamNonCriticalMetrics(): Flux<Metric> {\n    return metricsSource.stream()\n        .onBackpressureDrop { metric ->\n            logger.debug(\"Dropped non-critical metric: {}\", metric.name)\n        }\n}\n\n// ✅ Kotlin Flow: Use buffer with bounded capacity\nfun streamEventsAsFlow(): Flow<Event> {\n    return eventSource.asFlow()\n        .buffer(capacity = 256) // Bounded buffer with suspension on overflow\n}"
           }
         }
       ]
@@ -110,6 +238,31 @@
     },
     {
       "skill": "kotlin-webflux-best-practices",
+      "rule": "reactive-structured-concurrency",
+      "title": "Use structured concurrency instead of GlobalScope",
+      "impact": "HIGH",
+      "tags": [
+        "kotlin",
+        "coroutines",
+        "globalscope",
+        "structured-concurrency",
+        "supervisorscope"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "kotlin",
+            "code": "// ❌ GlobalScope coroutines leak — no cancellation, no error propagation\nclass OrderService(\n    private val paymentClient: PaymentClient,\n    private val inventoryClient: InventoryClient\n) {\n    suspend fun placeOrder(order: Order): OrderResult {\n        // These coroutines are never cancelled if the request is aborted\n        GlobalScope.launch { paymentClient.charge(order) }\n        GlobalScope.launch { inventoryClient.reserve(order) }\n        // No way to know if payment or inventory failed!\n        return OrderResult(status = \"ACCEPTED\")\n    }\n}"
+          },
+          "correct": {
+            "lang": "kotlin",
+            "code": "import kotlinx.coroutines.async\nimport kotlinx.coroutines.coroutineScope\nimport kotlinx.coroutines.supervisorScope\n\nclass OrderService(\n    private val paymentClient: PaymentClient,\n    private val inventoryClient: InventoryClient,\n    private val notificationService: NotificationService\n) {\n    // ✅ coroutineScope: all children are cancelled if any one fails\n    suspend fun placeOrder(order: Order): OrderResult = coroutineScope {\n        val payment = async { paymentClient.charge(order) }\n        val inventory = async { inventoryClient.reserve(order) }\n\n        // Both results are awaited; if either fails, the other is cancelled\n        OrderResult(\n            paymentId = payment.await().id,\n            reservationId = inventory.await().id,\n            status = \"CONFIRMED\"\n        )\n    }\n\n    // ✅ supervisorScope: one child's failure does not cancel siblings\n    suspend fun placeOrderWithNotification(order: Order) = supervisorScope {\n        val result = async { placeOrder(order) }\n\n        // Notification failure should NOT cancel the order\n        val notification = async {\n            try {\n                notificationService.sendConfirmation(order)\n            } catch (e: Exception) {\n                logger.warn(\"Notification failed, order still processed\", e)\n            }\n        }\n\n        result.await()\n    }\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "kotlin-webflux-best-practices",
       "rule": "routing-functional",
       "title": "Prefer functional routing over annotations",
       "impact": "MEDIUM",
@@ -129,6 +282,106 @@
           "correct": {
             "lang": "kotlin",
             "code": "import org.springframework.context.annotation.Bean\nimport org.springframework.context.annotation.Configuration\nimport org.springframework.web.reactive.function.server.coRouter\n\n// ✅ Declarative, composable functional routing\n@Configuration\nclass UserRouterConfiguration {\n\n    @Bean\n    fun userRoutes(userHandler: UserHandler) = coRouter {\n        \"/api/users\".nest {\n            GET(\"/{id}\", userHandler::getUser)\n            POST(\"/\", userHandler::createUser)\n        }\n    }\n}\n\n// Handlers are plain Spring components with suspend functions\n@Component\nclass UserHandler(private val userService: UserService) {\n\n    suspend fun getUser(request: ServerRequest): ServerResponse {\n        val id = request.pathVariable(\"id\")\n        val user = userService.findById(id)\n        return ServerResponse.ok().bodyValueAndAwait(user)\n    }\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "kotlin-webflux-best-practices",
+      "rule": "routing-request-validation",
+      "title": "Validate request bodies in functional routes using Bean Validation",
+      "impact": "HIGH",
+      "tags": [
+        "webflux",
+        "validation",
+        "routing",
+        "bean-validation",
+        "functional"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "kotlin",
+            "code": "// ❌ No validation — malformed data passes directly to the service layer\nfun createUserHandler(request: ServerRequest): ServerResponse {\n    val body = request.awaitBody<CreateUserRequest>()\n    // body.email could be blank, body.age could be negative\n    // No validation happens — invalid data goes straight to the database\n    val user = userService.createUser(body)\n    return ServerResponse.ok().bodyValueAndAwait(user)\n}\n\ndata class CreateUserRequest(\n    val name: String,    // Could be empty\n    val email: String,   // Could be \"not-an-email\"\n    val age: Int         // Could be -5\n)"
+          },
+          "correct": {
+            "lang": "kotlin",
+            "code": "import jakarta.validation.Validator\nimport jakarta.validation.constraints.Email\nimport jakarta.validation.constraints.Min\nimport jakarta.validation.constraints.NotBlank\nimport org.springframework.web.server.ServerWebInputException\nimport org.springframework.web.reactive.function.server.ServerRequest\nimport org.springframework.web.reactive.function.server.ServerResponse\nimport org.springframework.web.reactive.function.server.awaitBody\nimport org.springframework.web.reactive.function.server.bodyValueAndAwait\n\n// ✅ Validated request DTO with Bean Validation annotations\ndata class CreateUserRequest(\n    @field:NotBlank(message = \"Name is required\")\n    val name: String,\n    @field:Email(message = \"Must be a valid email address\")\n    @field:NotBlank(message = \"Email is required\")\n    val email: String,\n    @field:Min(value = 0, message = \"Age must be non-negative\")\n    val age: Int\n)\n\nclass UserHandler(private val userService: UserService, private val validator: Validator) {\n\n    // ✅ Validate the body and throw ServerWebInputException on violations\n    suspend fun createUser(request: ServerRequest): ServerResponse {\n        val body = request.awaitBody<CreateUserRequest>()\n        val violations = validator.validate(body)\n        if (violations.isNotEmpty()) {\n            val errors = violations.joinToString(\"; \") { \"${it.propertyPath}: ${it.message}\" }\n            throw ServerWebInputException(\"Validation failed: $errors\")\n        }\n        val user = userService.createUser(body)\n        return ServerResponse.ok().bodyValueAndAwait(user)\n    }\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "kotlin-webflux-best-practices",
+      "rule": "security-cors-csrf",
+      "title": "Configure CORS and CSRF correctly for reactive APIs",
+      "impact": "MEDIUM",
+      "tags": [
+        "security",
+        "cors",
+        "csrf",
+        "webflux",
+        "api"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "kotlin",
+            "code": "// ❌ CORS wildcard with credentials — browsers reject this combination\n@Configuration\n@EnableWebFluxSecurity\nclass SecurityConfig {\n\n    @Bean\n    fun securityWebFilterChain(http: ServerHttpSecurity): SecurityWebFilterChain {\n        return http {\n            cors {\n                configurationSource = CorsConfigurationSource {\n                    CorsConfiguration().apply {\n                        allowedOrigins = listOf(\"*\") // ❌ Wildcard\n                        allowCredentials = true       // ❌ Can't use with wildcard!\n                        allowedMethods = listOf(\"*\")\n                    }\n                }\n            }\n            // ❌ CSRF is enabled by default — blocks POST requests from API clients\n            // that don't send CSRF tokens (mobile apps, SPAs with JWT)\n        }\n    }\n}"
+          },
+          "correct": {
+            "lang": "kotlin",
+            "code": "import org.springframework.context.annotation.Bean\nimport org.springframework.context.annotation.Configuration\nimport org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity\nimport org.springframework.security.config.web.server.ServerHttpSecurity\nimport org.springframework.security.web.server.SecurityWebFilterChain\nimport org.springframework.web.cors.CorsConfiguration\nimport org.springframework.web.cors.reactive.CorsConfigurationSource\nimport org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource\nimport org.springframework.security.config.web.server.invoke\n\n@Configuration\n@EnableWebFluxSecurity\nclass SecurityConfig {\n\n    @Bean\n    fun securityWebFilterChain(http: ServerHttpSecurity): SecurityWebFilterChain {\n        return http {\n            cors {\n                configurationSource = corsConfigurationSource()\n            }\n            // ✅ Disable CSRF only for stateless token-based APIs (JWT/OAuth2)\n            // CSRF protection is unnecessary when using Bearer tokens because\n            // the token itself serves as proof of intent — browsers cannot\n            // automatically attach it like they do with cookies.\n            csrf { disable() }\n            authorizeExchange {\n                authorize(anyExchange, authenticated)\n            }\n            oauth2ResourceServer {\n                jwt { }\n            }\n        }\n    }\n\n    // ✅ Specific origins, explicit methods, and credentials support\n    @Bean\n    fun corsConfigurationSource(): CorsConfigurationSource {\n        val config = CorsConfiguration().apply {\n            allowedOrigins = listOf(\n                \"https://app.example.com\",\n                \"https://admin.example.com\"\n            )\n            allowedMethods = listOf(\"GET\", \"POST\", \"PUT\", \"DELETE\", \"OPTIONS\")\n            allowedHeaders = listOf(\"Authorization\", \"Content-Type\", \"X-Request-ID\")\n            exposedHeaders = listOf(\"X-Request-ID\", \"X-Correlation-ID\")\n            allowCredentials = true\n            maxAge = 3600L\n        }\n        return UrlBasedCorsConfigurationSource().apply {\n            registerCorsConfiguration(\"/api/**\", config)\n        }\n    }\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "kotlin-webflux-best-practices",
+      "rule": "security-reactive-config",
+      "title": "Configure Spring Security with reactive SecurityWebFilterChain",
+      "impact": "HIGH",
+      "tags": [
+        "security",
+        "webflux",
+        "spring-security",
+        "authentication",
+        "authorization"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "kotlin",
+            "code": "// ❌ Servlet-based security — does NOT work in WebFlux!\n@EnableWebSecurity\nclass SecurityConfig {\n\n    @Bean\n    fun securityFilterChain(http: HttpSecurity): SecurityFilterChain {\n        // HttpSecurity is servlet-based and will not apply in WebFlux\n        http.authorizeHttpRequests { auth ->\n            auth.requestMatchers(\"/api/public/**\").permitAll()\n            auth.anyRequest().authenticated()\n        }\n        return http.build()\n    }\n}\n\n// ❌ SecurityContextHolder is thread-local — empty in reactive code\nsuspend fun getCurrentUser(): String {\n    val auth = SecurityContextHolder.getContext().authentication\n    return auth.name // Returns null — thread-local is not propagated\n}"
+          },
+          "correct": {
+            "lang": "kotlin",
+            "code": "import org.springframework.context.annotation.Bean\nimport org.springframework.context.annotation.Configuration\nimport org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity\nimport org.springframework.security.config.web.server.ServerHttpSecurity\nimport org.springframework.security.web.server.SecurityWebFilterChain\nimport org.springframework.security.core.context.ReactiveSecurityContextHolder\nimport org.springframework.security.config.web.server.invoke\n\n// ✅ Use @EnableWebFluxSecurity for reactive applications\n@Configuration\n@EnableWebFluxSecurity\nclass SecurityConfig {\n\n    @Bean\n    fun securityWebFilterChain(http: ServerHttpSecurity): SecurityWebFilterChain {\n        return http {\n            authorizeExchange {\n                authorize(\"/api/public/**\", permitAll)\n                authorize(\"/api/health\", permitAll)\n                authorize(\"/api/admin/**\", hasRole(\"ADMIN\"))\n                authorize(anyExchange, authenticated)\n            }\n            oauth2ResourceServer {\n                jwt { }\n            }\n            csrf { disable() } // Disable for stateless JWT APIs\n        }\n    }\n}\n\n// ✅ Use ReactiveSecurityContextHolder in handlers\nclass UserHandler {\n\n    suspend fun getCurrentUserProfile(request: ServerRequest): ServerResponse {\n        val principal = ReactiveSecurityContextHolder.getContext()\n            .awaitSingle()\n            .authentication\n            .name\n\n        val profile = userService.findByUsername(principal)\n        return ServerResponse.ok().bodyValueAndAwait(profile)\n    }\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "kotlin-webflux-best-practices",
+      "rule": "test-blockhound",
+      "title": "Use BlockHound to detect accidental blocking calls in tests",
+      "impact": "MEDIUM",
+      "tags": [
+        "testing",
+        "blockhound",
+        "blocking",
+        "webflux",
+        "event-loop"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "kotlin",
+            "code": "// ❌ No BlockHound — blocking calls silently degrade performance\n@SpringBootTest\nclass UserServiceTest {\n\n    @Test\n    fun `should fetch user profile`() {\n        // This test passes even if getUserProfile() accidentally\n        // calls Thread.sleep() or uses JDBC on the event loop thread\n        val result = runBlocking {\n            userService.getUserProfile(\"123\")\n        }\n        assertThat(result.name).isEqualTo(\"Alice\")\n    }\n    // Blocking bug ships to production undetected!\n}"
+          },
+          "correct": {
+            "lang": "kotlin",
+            "code": "import io.projectreactor.tools.agent.BlockHound\nimport org.junit.jupiter.api.BeforeAll\nimport org.junit.jupiter.api.Test\nimport org.junit.jupiter.api.extension.BeforeAllCallback\nimport org.junit.jupiter.api.extension.ExtendWith\nimport org.junit.jupiter.api.extension.ExtensionContext\n\n// ✅ Option 1: JUnit extension for automatic BlockHound installation\nclass BlockHoundExtension : BeforeAllCallback {\n    override fun beforeAll(context: ExtensionContext) {\n        BlockHound.install()\n    }\n}\n\n@ExtendWith(BlockHoundExtension::class)\n@SpringBootTest\nclass UserServiceTest {\n\n    @Test\n    fun `should fetch user profile without blocking`() {\n        // ✅ BlockHound will throw if any blocking call happens\n        // on a non-blocking thread (e.g., Netty event loop)\n        val result = runBlocking {\n            userService.getUserProfile(\"123\")\n        }\n        assertThat(result.name).isEqualTo(\"Alice\")\n    }\n\n    @Test\n    fun `should detect accidental blocking`() {\n        // If getUserProfile() internally calls Thread.sleep()\n        // or uses JDBC, BlockHound throws:\n        // reactor.blockhound.BlockingOperationError:\n        //   Blocking call! java.lang.Thread.sleep\n        assertThrows<BlockingOperationError> {\n            // This would fail fast instead of silently degrading\n        }\n    }\n}\n\n// ✅ Option 2: @BeforeAll in a base test class\nabstract class ReactiveTestBase {\n    companion object {\n        @JvmStatic\n        @BeforeAll\n        fun installBlockHound() {\n            BlockHound.install()\n        }\n    }\n}"
           }
         }
       ]
@@ -155,6 +408,104 @@
           "correct": {
             "lang": "kotlin",
             "code": "import kotlinx.coroutines.test.runTest\nimport reactor.test.StepVerifier\n\n// ✅ For raw Mono/Flux (if interfacing with Java libraries)\n@Test\nfun `test Mono emission`() {\n    val publisher = userService.findByIdReactive(\"123\")\n    \n    StepVerifier.create(publisher)\n        .expectNextMatches { user -> user.name == \"Alice\" }\n        .verifyComplete()\n}\n\n// ✅ For Coroutines (suspend functions)\n@Test\nfun `test suspend function`() = runTest {\n    // Virtual time: delays are skipped instantly!\n    val result = userService.findByIdSuspend(\"123\") \n    assertEquals(\"Alice\", result.name)\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "kotlin-webflux-best-practices",
+      "rule": "test-webtestclient",
+      "title": "Use WebTestClient for integration testing of reactive endpoints",
+      "impact": "MEDIUM",
+      "tags": [
+        "testing",
+        "webtestclient",
+        "webflux",
+        "integration-test"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "kotlin",
+            "code": "// ❌ Using blocking calls in tests — slow, fragile, hides async bugs\n@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)\nclass UserControllerTest(@Autowired val webClient: WebClient.Builder) {\n\n    @Test\n    fun `should get user by id`() {\n        val response = webClient.build()\n            .get()\n            .uri(\"http://localhost:$port/api/users/123\")\n            .retrieve()\n            .bodyToMono(UserResponse::class.java)\n            .block() // ❌ Blocks the test thread, masks timing issues\n\n        assertThat(response?.name).isEqualTo(\"Alice\")\n    }\n}"
+          },
+          "correct": {
+            "lang": "kotlin",
+            "code": "import org.springframework.beans.factory.annotation.Autowired\nimport org.springframework.boot.test.autoconfigure.web.reactive.WebFluxTest\nimport org.springframework.test.web.reactive.server.WebTestClient\nimport org.springframework.test.web.reactive.server.expectBody\n\n// ✅ Use @WebFluxTest for lightweight, focused integration tests\n@WebFluxTest(UserHandler::class)\nclass UserControllerTest(@Autowired val webTestClient: WebTestClient) {\n\n    @Test\n    fun `should get user by id`() {\n        webTestClient.get()\n            .uri(\"/api/users/123\")\n            .exchange()\n            .expectStatus().isOk\n            .expectBody<UserResponse>()\n            .isEqualTo(UserResponse(id = \"123\", name = \"Alice\", email = \"alice@example.com\"))\n    }\n\n    @Test\n    fun `should return 404 for unknown user`() {\n        webTestClient.get()\n            .uri(\"/api/users/unknown\")\n            .exchange()\n            .expectStatus().isNotFound\n            .expectBody()\n            .jsonPath(\"$.message\").isEqualTo(\"User not found\")\n    }\n\n    @Test\n    fun `should create user with valid body`() {\n        webTestClient.post()\n            .uri(\"/api/users\")\n            .bodyValue(CreateUserRequest(name = \"Bob\", email = \"bob@test.com\", age = 30))\n            .exchange()\n            .expectStatus().isCreated\n            .expectBody<UserResponse>()\n            .value { user ->\n                assertThat(user.name).isEqualTo(\"Bob\")\n                assertThat(user.id).isNotBlank()\n            }\n    }\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "kotlin-webflux-best-practices",
+      "rule": "webclient-configuration",
+      "title": "Configure WebClient with timeouts and connection pooling",
+      "impact": "HIGH",
+      "tags": [
+        "webclient",
+        "configuration",
+        "timeout",
+        "connection-pool",
+        "netty"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "kotlin",
+            "code": "// ❌ No timeouts or connection limits — hangs forever on slow services\n@Configuration\nclass WebClientConfig {\n\n    @Bean\n    fun paymentWebClient(): WebClient {\n        // Default: no response timeout, no connect timeout,\n        // unbounded connection pool, default 256KB memory buffer\n        return WebClient.create(\"https://payment-service.internal\")\n    }\n}"
+          },
+          "correct": {
+            "lang": "kotlin",
+            "code": "import io.netty.channel.ChannelOption\nimport org.springframework.context.annotation.Bean\nimport org.springframework.context.annotation.Configuration\nimport org.springframework.http.client.reactive.ReactorClientHttpConnector\nimport org.springframework.web.reactive.function.client.ExchangeStrategies\nimport org.springframework.web.reactive.function.client.WebClient\nimport reactor.netty.http.client.HttpClient\nimport reactor.netty.resources.ConnectionProvider\nimport java.time.Duration\n\n@Configuration\nclass WebClientConfig {\n\n    @Bean\n    fun paymentWebClient(): WebClient {\n        // ✅ Configure connection pool with sensible limits\n        val connectionProvider = ConnectionProvider.builder(\"payment-pool\")\n            .maxConnections(50)\n            .pendingAcquireMaxCount(100)\n            .pendingAcquireTimeout(Duration.ofSeconds(5))\n            .maxIdleTime(Duration.ofSeconds(30))\n            .maxLifeTime(Duration.ofMinutes(5))\n            .build()\n\n        // ✅ Configure HTTP client with timeouts\n        val httpClient = HttpClient.create(connectionProvider)\n            .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 5_000)\n            .responseTimeout(Duration.ofSeconds(10))\n\n        // ✅ Set memory buffer limit for large responses\n        val exchangeStrategies = ExchangeStrategies.builder()\n            .codecs { it.defaultCodecs().maxInMemorySize(2 * 1024 * 1024) } // 2MB\n            .build()\n\n        return WebClient.builder()\n            .baseUrl(\"https://payment-service.internal\")\n            .clientConnector(ReactorClientHttpConnector(httpClient))\n            .exchangeStrategies(exchangeStrategies)\n            .defaultHeader(\"Accept\", \"application/json\")\n            .build()\n    }\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "kotlin-webflux-best-practices",
+      "rule": "webclient-error-handling",
+      "title": "Handle WebClient error responses with onStatus",
+      "impact": "HIGH",
+      "tags": [
+        "webclient",
+        "error-handling",
+        "onstatus",
+        "reactive"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "kotlin",
+            "code": "// ❌ No onStatus — throws generic WebClientResponseException\nclass InventoryClient(private val webClient: WebClient) {\n\n    suspend fun checkStock(productId: String): StockLevel {\n        // 404 and 503 both throw WebClientResponseException\n        // Callers can't distinguish \"product not found\" from \"service down\"\n        return webClient.get()\n            .uri(\"/api/inventory/{id}\", productId)\n            .retrieve()\n            .awaitBody<StockLevel>()\n    }\n}"
+          },
+          "correct": {
+            "lang": "kotlin",
+            "code": "import org.springframework.http.HttpStatusCode\nimport org.springframework.web.reactive.function.client.WebClient\nimport org.springframework.web.reactive.function.client.awaitBody\nimport org.springframework.web.reactive.function.client.bodyToMono\n\n// ✅ Map HTTP error codes to domain exceptions using onStatus\nclass InventoryClient(private val webClient: WebClient) {\n\n    suspend fun checkStock(productId: String): StockLevel {\n        return webClient.get()\n            .uri(\"/api/inventory/{id}\", productId)\n            .retrieve()\n            .onStatus(HttpStatusCode::is4xxClientError) { response ->\n                response.bodyToMono<ErrorBody>().map { body ->\n                    when (response.statusCode().value()) {\n                        404 -> ProductNotFoundException(\"Product $productId not found\")\n                        409 -> StockConflictException(\"Concurrent stock update for $productId\")\n                        else -> InvalidRequestException(\"Client error: ${body.message}\")\n                    }\n                }\n            }\n            .onStatus(HttpStatusCode::is5xxServerError) { response ->\n                response.bodyToMono<ErrorBody>().map { body ->\n                    // Mark as retryable so upstream retry logic can handle it\n                    ServiceUnavailableException(\n                        \"Inventory service error: ${body.message}\",\n                        retryable = true\n                    )\n                }\n            }\n            .awaitBody<StockLevel>()\n    }\n}\n\n// ✅ Domain exceptions with clear semantics\nclass ProductNotFoundException(message: String) : RuntimeException(message)\nclass StockConflictException(message: String) : RuntimeException(message)\nclass ServiceUnavailableException(\n    message: String,\n    val retryable: Boolean = false\n) : RuntimeException(message)"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "kotlin-webflux-best-practices",
+      "rule": "webclient-retry",
+      "title": "Retry transient failures with exponential backoff",
+      "impact": "MEDIUM",
+      "tags": [
+        "webclient",
+        "retry",
+        "backoff",
+        "resilience",
+        "transient-errors"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "kotlin",
+            "code": "// ❌ Immediate retry loop — thundering herd, no backoff, retries on all errors\nclass CatalogClient(private val webClient: WebClient) {\n\n    suspend fun getProduct(id: String): Product {\n        var lastException: Exception? = null\n        repeat(3) { attempt ->\n            try {\n                return webClient.get()\n                    .uri(\"/api/products/{id}\", id)\n                    .retrieve()\n                    .awaitBody<Product>()\n            } catch (e: Exception) {\n                lastException = e\n                // ❌ Retries immediately, even on 404 (not found) or 400 (bad request)\n            }\n        }\n        throw lastException!!\n    }\n}"
+          },
+          "correct": {
+            "lang": "kotlin",
+            "code": "import org.springframework.web.reactive.function.client.WebClient\nimport org.springframework.web.reactive.function.client.WebClientResponseException\nimport reactor.util.retry.Retry\nimport java.time.Duration\n\n// ✅ Retry only transient errors with exponential backoff and jitter\nclass CatalogClient(private val webClient: WebClient) {\n\n    private val retrySpec = Retry.backoff(3, Duration.ofMillis(200))\n        .maxBackoff(Duration.ofSeconds(5))\n        .jitter(0.5) // Adds randomness to prevent thundering herd\n        .filter { throwable ->\n            // ✅ Only retry on server errors and connection issues\n            when (throwable) {\n                is WebClientResponseException.ServiceUnavailable -> true\n                is WebClientResponseException.GatewayTimeout -> true\n                is java.net.ConnectException -> true\n                is java.io.IOException -> true\n                else -> false // Don't retry 4xx or unknown errors\n            }\n        }\n        .doBeforeRetry { signal ->\n            logger.warn(\n                \"Retry attempt {} for catalog call, cause: {}\",\n                signal.totalRetries() + 1,\n                signal.failure().message\n            )\n        }\n        .onRetryExhaustedThrow { _, signal ->\n            ServiceUnavailableException(\n                \"Catalog service unavailable after ${signal.totalRetries()} retries\",\n                signal.failure()\n            )\n        }\n\n    suspend fun getProduct(id: String): Product {\n        return webClient.get()\n            .uri(\"/api/products/{id}\", id)\n            .retrieve()\n            .bodyToMono(Product::class.java)\n            .retryWhen(retrySpec)\n            .awaitSingle()\n    }\n}"
           }
         }
       ]

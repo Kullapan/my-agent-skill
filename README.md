@@ -44,6 +44,15 @@ gh skill install <OWNER>/<REPO> react-best-practices
 ### Prerequisites
 
 - GitHub CLI (`gh`) version `v2.90.0` or later must be installed and authenticated.
+  > [!IMPORTANT]
+  > You **must** be authenticated to avoid hitting GitHub API rate limits (unauthenticated requests are limited to 60/hr and will fail during installation). Run:
+  > ```bash
+  > gh auth login
+  > ```
+  > Or set your token via environment variables:
+  > ```bash
+  > export GH_TOKEN="your_personal_access_token"
+  > ```
 - Run the command from the root directory of the target project where you want to use the skill.
 - Replace `<OWNER>/<REPO>` with the path to the GitHub repository hosting this skill library (e.g., `your-org/shared-skills`).
 

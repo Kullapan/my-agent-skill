@@ -12,7 +12,8 @@
 
 ## 1. API Design & DTOs {#section-1}
 
-**Impact:** UNKNOWN
+**Impact:** CRITICAL
+**Description:** API contracts must be strictly separated from internal database models. Exposing JPA entities directly via REST endpoints leads to accidental data leakage (mass assignment) and tight coupling.
 
 ## Use immutable data classes for all API contracts
 
@@ -135,7 +136,8 @@ Extension functions (`fun Entity.toDto()`) keep mapping logic cleanly separated 
 
 ## 2. Error Handling & Validation {#section-2}
 
-**Impact:** UNKNOWN
+**Impact:** HIGH
+**Description:** APIs must validate incoming data and return consistent, structured error responses using standard HTTP status codes. Centralized error handling ensures API consistency.
 
 ## Centralize exception handling with @RestControllerAdvice
 
@@ -273,7 +275,8 @@ Make sure you handle `MethodArgumentNotValidException` in your `@RestControllerA
 
 ## 3. Kotlin Language Features {#section-3}
 
-**Impact:** UNKNOWN
+**Impact:** HIGH
+**Description:** Idiomatic Kotlin reduces boilerplate and runtime errors. Use features like null-safety and extension functions rather than falling back to Java-style `Optional` or static utility classes.
 
 ## Leverage Kotlin's null-safety system for optional API fields
 

@@ -1,12 +1,12 @@
 # Security Review Best Practices
 
 > **Organization:** Security Engineering
-> **Version:** 1.0.0
+> **Version:** 2.0.0
 > **Date:** June 2026
 
 ## Abstract
 
-Comprehensive security review guide for web applications and APIs. Contains 35+ rules across 8 OWASP-aligned categories covering authentication, injection prevention, secrets management, API security, data protection, dependency hygiene, error handling, and infrastructure hardening. Each rule includes vulnerable vs. secure code examples to guide automated code review, generation, and security audits.
+Static Application Security Testing (SAST) guide for web applications and APIs, aligned to OWASP Top 10:2025. Contains 50 rules across 11 categories covering authentication, injection prevention, secrets management, API security, data protection, dependency analysis, error handling, infrastructure hardening, SCA/CVE scanning, SAST tooling, and secure design. All rules are evaluable through static code review — no dynamic scanning required.
 
 ## Table of Contents
 
@@ -14,18 +14,20 @@ Comprehensive security review guide for web applications and APIs. Contains 35+ 
 2. [Authentication & Authorization](#section-2)
 3. [Data Protection & Cryptography](#section-3)
 4. [Dependency & Supply Chain Security](#section-4)
-5. [Error Handling & Logging](#section-5)
-6. [Infrastructure & HTTP Hardening](#section-6)
-7. [Input Validation & Injection Prevention](#section-7)
-8. [Static Application Security Testing & Code Analysis](#section-8)
-9. [Software Composition Analysis & CVE Scanning](#section-9)
-10. [Secrets & Credentials Management](#section-10)
+5. [Secure Design](#section-5)
+6. [Error Handling & Logging](#section-6)
+7. [Infrastructure & HTTP Hardening](#section-7)
+8. [Input Validation & Injection Prevention](#section-8)
+9. [Static Application Security Testing & Code Analysis](#section-9)
+10. [Software Composition Analysis & CVE Scanning](#section-10)
+11. [Secrets & Credentials Management](#section-11)
 
 ---
 
 ## 1. API Security {#section-1}
 
-**Impact:** UNKNOWN
+**Impact:** HIGH
+**Description:** APIs are the primary attack surface for modern applications. Rate limiting, CORS, schema validation, HTTPS enforcement, secure file uploads, and idempotency are essential first lines of defense.
 
 ## Configure CORS to Allow Only Trusted Origins
 
@@ -98,6 +100,96 @@ Reference: [OWASP CORS Cheat Sheet](https://cheatsheetseries.owasp.org/cheatshee
 
 ---
 
+## Secure File Upload Handling
+
+**Impact: HIGH — CWE-434**
+
+Unrestricted file uploads are one of the most dangerous vulnerabilities — they can lead to remote code execution (uploading web shells), stored XSS (uploading HTML/SVG with scripts), denial of service (uploading enormous files), and path traversal (overwriting critical files). The client-provided filename and MIME type cannot be trusted — attackers rename `shell.php` to `shell.jpg` and set the Content-Type to `image/jpeg`.
+
+**Vulnerable (trusting client-provided file metadata):**
+
+```typescript
+// ❌ Trusting filename, MIME type, and size from the client
+import multer from 'multer'
+
+const upload = multer({
+  dest: 'public/uploads/',  // Stored in publicly accessible directory!
+  // No file size limit
+  // No file type validation
+})
+
+app.post('/api/upload', upload.single('file'), async (req, res) => {
+  const file = req.file!
+  // ❌ Using original filename — path traversal: "../../../etc/cron.d/backdoor"
+  const finalPath = `public/uploads/${file.originalname}`
+  await fs.rename(file.path, finalPath)
+
+  // File is now served at https://app.com/uploads/malicious.html
+  // If it contains <script>alert(document.cookie)</script> → stored XSS
+  res.json({ url: `/uploads/${file.originalname}` })
+})
+```
+
+**Secure (validated uploads with safe storage):**
+
+```typescript
+import multer from 'multer'
+import { fileTypeFromBuffer } from 'file-type'
+import crypto from 'crypto'
+import path from 'path'
+
+// ✅ Strict file size limit
+const upload = multer({
+  dest: '/tmp/uploads/',                  // Temporary staging — NOT public
+  limits: { fileSize: 5 * 1024 * 1024 },  // 5MB max
+})
+
+const ALLOWED_TYPES = new Map([
+  ['image/jpeg', '.jpg'],
+  ['image/png', '.png'],
+  ['image/webp', '.webp'],
+  ['application/pdf', '.pdf'],
+])
+
+app.post('/api/upload', upload.single('file'), async (req, res) => {
+  const file = req.file!
+
+  // ✅ Step 1: Validate MIME type by reading magic bytes (not trusting headers)
+  const buffer = await fs.readFile(file.path)
+  const detected = await fileTypeFromBuffer(buffer)
+
+  if (!detected || !ALLOWED_TYPES.has(detected.mime)) {
+    await fs.unlink(file.path)  // Clean up rejected file
+    return res.status(400).json({ error: 'File type not allowed' })
+  }
+
+  // ✅ Step 2: Generate a safe random filename (ignore client filename entirely)
+  const safeFilename = `${crypto.randomUUID()}${ALLOWED_TYPES.get(detected.mime)}`
+
+  // ✅ Step 3: Store outside the webroot — serve via a controller, not static files
+  const storagePath = path.join('/var/app/storage/uploads', safeFilename)
+  await fs.rename(file.path, storagePath)
+
+  // ✅ Step 4: Store metadata in database, serve through an authenticated endpoint
+  const record = await db.uploads.create({
+    id: crypto.randomUUID(),
+    filename: safeFilename,
+    originalName: file.originalname,
+    mimeType: detected.mime,
+    size: file.size,
+    uploadedBy: req.user.id,
+  })
+
+  res.json({ id: record.id, url: `/api/files/${record.id}` })
+})
+```
+
+Never trust client-provided filenames or MIME types. Validate file types by reading magic bytes. Store uploads outside the webroot. Generate random filenames. Serve files through authenticated controllers with proper `Content-Type` and `Content-Disposition` headers.
+
+Reference: [OWASP File Upload Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html)
+
+---
+
 ## Enforce HTTPS and Set HTTP Strict Transport Security (HSTS)
 
 **Impact: HIGH — CWE-319**
@@ -161,6 +253,89 @@ app.use(helmet())
 Submit your domain to the [HSTS preload list](https://hstspreload.org) for the strongest protection. Use TLS 1.2+ only — disable TLS 1.0 and 1.1. Obtain certificates from Let's Encrypt (free) or your CA.
 
 Reference: [OWASP Transport Layer Security Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Transport_Layer_Protection_Cheat_Sheet.html)
+
+---
+
+## Use Idempotency Keys for Mutating Endpoints
+
+**Impact: HIGH — CWE-20**
+
+Without idempotency protection, network retries, client bugs, or user double-clicks can cause duplicate payments, double order submissions, or repeated side effects. An idempotency key is a client-generated unique identifier sent with each request — the server processes the request once and returns the cached response for subsequent calls with the same key. This prevents financial loss, data corruption, and user frustration.
+
+**Vulnerable (no idempotency — duplicate processing):**
+
+```typescript
+// ❌ No idempotency — retried requests charge the customer twice
+app.post('/api/payments', async (req, res) => {
+  const { amount, currency, customerId } = req.body
+
+  // If the network drops after charging but before the response reaches the client,
+  // the client retries → customer is charged twice
+  const charge = await stripe.charges.create({
+    amount,
+    currency,
+    customer: customerId,
+  })
+
+  await db.payments.insert({
+    chargeId: charge.id,
+    amount,
+    customerId,
+  })
+
+  res.json({ success: true, chargeId: charge.id })
+})
+```
+
+**Secure (idempotency key with server-side deduplication):**
+
+```typescript
+// ✅ Idempotency key prevents duplicate processing
+app.post('/api/payments', async (req, res) => {
+  const idempotencyKey = req.headers['idempotency-key'] as string
+
+  if (!idempotencyKey) {
+    return res.status(400).json({ error: 'Idempotency-Key header is required' })
+  }
+
+  // Check if this key was already processed
+  const existing = await db.idempotencyKeys.findOne({
+    key: idempotencyKey,
+    endpoint: '/api/payments',
+  })
+
+  if (existing) {
+    // Return the cached response — no side effects executed
+    return res.status(existing.statusCode).json(existing.responseBody)
+  }
+
+  // Process the request (first time with this key)
+  const { amount, currency, customerId } = req.body
+  const charge = await stripe.charges.create({
+    amount,
+    currency,
+    customer: customerId,
+    idempotencyKey,  // Stripe also supports idempotency natively
+  })
+
+  const response = { success: true, chargeId: charge.id }
+
+  // Cache the response for this idempotency key (TTL: 24 hours)
+  await db.idempotencyKeys.insert({
+    key: idempotencyKey,
+    endpoint: '/api/payments',
+    statusCode: 200,
+    responseBody: response,
+    expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+  })
+
+  res.json(response)
+})
+```
+
+Require `Idempotency-Key` headers on all `POST`/`PUT`/`PATCH` endpoints that have side effects (payments, orders, notifications). Set TTLs on stored keys (24-48 hours) to prevent unbounded storage growth.
+
+Reference: [IETF Idempotency-Key Header RFC](https://datatracker.ietf.org/doc/draft-ietf-httpapi-idempotency-key-header/)
 
 ---
 
@@ -338,7 +513,8 @@ Reference: [OWASP Mass Assignment Cheat Sheet](https://cheatsheetseries.owasp.or
 
 ## 2. Authentication & Authorization {#section-2}
 
-**Impact:** UNKNOWN
+**Impact:** CRITICAL
+**Description:** Broken authentication and access control are the #1 and #2 most critical web vulnerabilities (OWASP A01/A07). Flaws here lead directly to account takeover, privilege escalation, SSRF, and full data breach.
 
 ## Fully Validate JWT Signature, Algorithm, and Claims
 
@@ -719,6 +895,89 @@ Reference: [OWASP Session Management Cheat Sheet](https://cheatsheetseries.owasp
 
 ---
 
+## Prevent Server-Side Request Forgery with URL Allowlists
+
+**Impact: CRITICAL — CWE-918**
+
+Server-Side Request Forgery (SSRF) occurs when an application fetches a URL provided by the user without validating the destination. Attackers exploit this to access internal services (metadata APIs, databases, admin panels), scan private networks, or exfiltrate data through the server. SSRF was OWASP A10 in 2021 and remains a top threat — the 2019 Capital One breach was caused by SSRF targeting the AWS metadata endpoint.
+
+**Vulnerable (unvalidated URL from user input):**
+
+```typescript
+// ❌ Fetches any URL the user provides — including internal services
+app.post('/api/preview', async (req, res) => {
+  const { url } = req.body
+
+  // Attacker sends: url = "http://169.254.169.254/latest/meta-data/iam/security-credentials/"
+  // → Server fetches AWS IAM credentials and returns them to the attacker
+
+  // Attacker sends: url = "http://10.0.0.5:6379/CONFIG+SET+dir+/var/www/html"
+  // → Server sends commands to internal Redis
+
+  const response = await fetch(url)
+  const html = await response.text()
+  res.json({ preview: html })
+})
+
+// ❌ DNS rebinding bypasses hostname checks
+// Attacker's DNS returns 1.2.3.4 on first lookup (passes validation)
+// then 169.254.169.254 on second lookup (actual fetch hits metadata API)
+```
+
+**Secure (URL allowlist with IP validation):**
+
+```typescript
+import { URL } from 'url'
+import dns from 'dns/promises'
+import ipaddr from 'ipaddr.js'
+
+// ✅ Allowlist of permitted domains
+const ALLOWED_HOSTS = new Set(['api.example.com', 'cdn.example.com', 'images.example.com'])
+
+// ✅ Block private/internal IP ranges
+function isPrivateIP(ip: string): boolean {
+  try {
+    const addr = ipaddr.parse(ip)
+    const range = addr.range()
+    return ['private', 'loopback', 'linkLocal', 'uniqueLocal', 'unspecified'].includes(range)
+  } catch {
+    return true  // Block unparseable addresses
+  }
+}
+
+app.post('/api/preview', async (req, res) => {
+  const { url: userUrl } = req.body
+
+  // Step 1: Parse and validate URL scheme
+  const parsed = new URL(userUrl)
+  if (!['https:'].includes(parsed.protocol)) {
+    return res.status(400).json({ error: 'Only HTTPS URLs are allowed' })
+  }
+
+  // Step 2: Check hostname against allowlist
+  if (!ALLOWED_HOSTS.has(parsed.hostname)) {
+    return res.status(400).json({ error: 'Domain not in allowlist' })
+  }
+
+  // Step 3: Resolve DNS and check for private IPs (prevents DNS rebinding)
+  const addresses = await dns.resolve4(parsed.hostname)
+  if (addresses.some(isPrivateIP)) {
+    return res.status(400).json({ error: 'Blocked: target resolves to private IP' })
+  }
+
+  // Step 4: Fetch with redirect disabled (prevents redirect to internal URLs)
+  const response = await fetch(userUrl, { redirect: 'error' })
+  const html = await response.text()
+  res.json({ preview: html.substring(0, 10000) })  // Limit response size
+})
+```
+
+Never allow user-controlled URLs to reach internal networks. Use domain allowlists, resolve DNS before fetching, block private IP ranges, and disable HTTP redirects on server-side HTTP clients.
+
+Reference: [OWASP SSRF Prevention Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html)
+
+---
+
 ## Use Short-Lived Access Tokens with Rotating Refresh Tokens
 
 **Impact: CRITICAL — CWE-613**
@@ -791,7 +1050,8 @@ Reference: [OWASP Session Management Cheat Sheet](https://cheatsheetseries.owasp
 
 ## 3. Data Protection & Cryptography {#section-3}
 
-**Impact:** UNKNOWN
+**Impact:** HIGH
+**Description:** Sensitive data must be encrypted at rest and in transit using modern algorithms (OWASP A04). Collect only what is needed; mask PII in all non-production contexts.
 
 ## Encrypt Sensitive Data at Rest with AES-256
 
@@ -1011,9 +1271,82 @@ Reference: [OWASP Logging Cheat Sheet](https://cheatsheetseries.owasp.org/cheats
 
 ---
 
+## Use TLS 1.2+ for All Data in Transit
+
+**Impact: HIGH — CWE-319**
+
+Data transmitted without TLS or with deprecated versions (TLS 1.0, 1.1, SSL 3.0) is vulnerable to interception, man-in-the-middle attacks, and protocol downgrade attacks (BEAST, POODLE, CRIME). All communication — between client and server, between microservices, and to databases — must use TLS 1.2 or higher. TLS 1.0 and 1.1 were officially deprecated by RFC 8996 in March 2021.
+
+**Vulnerable (no TLS or deprecated versions):**
+
+```typescript
+// ❌ HTTP connection to database — credentials sent in plain text
+import { Pool } from 'pg'
+const pool = new Pool({
+  host: 'db.internal.example.com',
+  user: 'app_user',
+  password: process.env.DB_PASSWORD,
+  ssl: false,  // Plain text connection — password visible on network
+})
+
+// ❌ Internal microservice call without TLS
+const response = await fetch('http://user-service.internal:3000/api/users/123')
+// Authentication headers sent in plain text over the network
+
+// ❌ Node.js HTTPS server allowing TLS 1.0
+import https from 'https'
+const server = https.createServer({
+  key: fs.readFileSync('server.key'),
+  cert: fs.readFileSync('server.crt'),
+  // No minVersion set — defaults allow TLS 1.0 and 1.1
+})
+```
+
+**Secure (TLS 1.2+ enforced everywhere):**
+
+```typescript
+// ✅ Database connection with TLS required
+import { Pool } from 'pg'
+const pool = new Pool({
+  host: 'db.internal.example.com',
+  user: 'app_user',
+  password: process.env.DB_PASSWORD,
+  ssl: {
+    rejectUnauthorized: true,              // Verify server certificate
+    ca: fs.readFileSync('/etc/ssl/db-ca.pem'),  // Pin the CA
+    minVersion: 'TLSv1.2',                // Reject TLS 1.0/1.1
+  },
+})
+
+// ✅ Internal service calls over HTTPS
+const response = await fetch('https://user-service.internal:3000/api/users/123', {
+  headers: { Authorization: `Bearer ${token}` },
+})
+
+// ✅ HTTPS server with TLS 1.2+ minimum
+import https from 'https'
+const server = https.createServer({
+  key: fs.readFileSync('server.key'),
+  cert: fs.readFileSync('server.crt'),
+  minVersion: 'TLSv1.2',     // Reject TLS 1.0 and 1.1
+  ciphers: [                   // Strong cipher suites only
+    'TLS_AES_256_GCM_SHA384',
+    'TLS_CHACHA20_POLY1305_SHA256',
+    'ECDHE-RSA-AES256-GCM-SHA384',
+  ].join(':'),
+})
+```
+
+Enforce TLS for all internal and external communication. Use `rejectUnauthorized: true` to validate server certificates. For internal services, consider mutual TLS (mTLS) where both client and server authenticate.
+
+Reference: [OWASP TLS Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Transport_Layer_Security_Cheat_Sheet.html)
+
+---
+
 ## 4. Dependency & Supply Chain Security {#section-4}
 
-**Impact:** UNKNOWN
+**Impact:** MEDIUM-HIGH
+**Description:** Third-party packages are a major vector for supply chain attacks (OWASP A03/A08). Audit dependencies regularly, pin versions via lock files, and minimize the attack surface.
 
 ## Audit Dependencies and Run Security Checks in CI
 
@@ -1213,9 +1546,248 @@ Reference: [OWASP Software Component Verification Standard](https://owasp.org/ww
 
 ---
 
-## 5. Error Handling & Logging {#section-5}
+## 5. Secure Design {#section-5}
 
-**Impact:** UNKNOWN
+**Impact:** HIGH
+**Description:** Insecure design cannot be fixed by code review alone (OWASP A06). Threat models, STRIDE analysis, and abuse case documentation during the design phase prevent architectural flaws that no amount of secure coding can fix.
+
+## Require Threat Models for New Features and Services
+
+**Impact: HIGH — CWE-1059**
+
+Insecure design cannot be fixed by code review alone — it requires identifying threats before writing code. Without threat modeling, teams discover security flaws in production (or not at all). A lightweight STRIDE-based threat model during design forces explicit thinking about trust boundaries, data flows, and abuse scenarios. This is the primary defense against OWASP A06 "Insecure Design" — the category that captures architectural flaws no amount of secure coding can fix.
+
+**Vulnerable (no threat model — security discovered too late):**
+
+```typescript
+// ❌ Feature designed and built without threat analysis
+// User story: "As a user, I can share files with other users via a public link"
+//
+// What the team missed:
+//   - No expiry on share links → permanent access even after revocation intent
+//   - Sequential share IDs → attacker can enumerate all shared files
+//   - No access logging → breach goes undetected
+//   - No rate limiting on link creation → mass exfiltration tool
+//   - Shared files include metadata with internal user IDs
+
+app.post('/api/shares', async (req, res) => {
+  const share = await db.shares.create({
+    fileId: req.body.fileId,
+    shareId: nextSequentialId++,        // Enumerable!
+    // No expiry, no access controls, no audit trail
+  })
+  res.json({ url: `https://app.com/share/${share.shareId}` })
+})
+```
+
+**Secure (lightweight STRIDE threat model as code review artifact):**
+
+```markdown
+# Threat Model: File Sharing Feature
+
+## Data Flow
+User → API Gateway → Share Service → Object Storage
+                  ↘ Notification Service → Email
+
+## Trust Boundaries
+1. Public Internet ↔ API Gateway (authentication required)
+2. API Gateway ↔ Internal Services (mTLS, service mesh)
+3. Share Link ↔ Object Storage (pre-signed URL, time-limited)
+
+## STRIDE Analysis
+
+| Threat | Category | Mitigation |
+|--------|----------|------------|
+| Attacker guesses share IDs | Spoofing | Use UUID v4 (128-bit random), not sequential IDs |
+| Revoked link still works | Tampering | Expire links after 7 days, support manual revocation |
+| No record of who accessed | Repudiation | Log every access with IP, user-agent, timestamp |
+| Shared file leaks metadata | Information Disclosure | Strip internal metadata before serving |
+| Mass link creation for exfiltration | Denial of Service | Rate limit: 10 shares/user/hour |
+| Link bypasses file permissions | Elevation of Privilege | Verify sharer still has access on every link use |
+
+## Abuse Cases
+- Attacker creates thousands of share links to exfiltrate entire drive
+- Former employee's share links remain active after account deletion
+- Search engines index share links, making files publicly discoverable
+```
+
+```typescript
+// ✅ Implementation reflects threat model mitigations
+app.post('/api/shares', rateLimit({ max: 10, window: '1h' }), async (req, res) => {
+  const share = await db.shares.create({
+    fileId: req.body.fileId,
+    shareId: crypto.randomUUID(),       // Non-enumerable UUID
+    createdBy: req.user.id,
+    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),  // 7-day expiry
+  })
+  auditLog.info({ action: 'share.created', fileId: req.body.fileId, userId: req.user.id })
+  res.json({ url: `https://app.com/share/${share.shareId}` })
+})
+```
+
+Create a threat model for every new feature that handles user data, authentication, or external integrations. The model doesn't need to be formal — a markdown file with STRIDE analysis and abuse cases in the PR is sufficient.
+
+Reference: [OWASP Threat Modeling Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Threat_Modeling_Cheat_Sheet.html)
+
+---
+
+## 6. Error Handling & Logging {#section-6}
+
+**Impact:** MEDIUM
+**Description:** Improper error handling leaks system internals to attackers and causes resource exhaustion (OWASP A09/A10). Security events must be logged without capturing sensitive data. Resources must be cleaned up in all code paths.
+
+## Implement Circuit Breakers and Graceful Degradation
+
+**Impact: MEDIUM — CWE-754**
+
+When a downstream service fails, applications that retry aggressively without backoff can amplify the failure into a cascading outage — overwhelming the struggling service, exhausting their own connection pools, and becoming unresponsive. A circuit breaker detects repeated failures and "opens" to stop sending requests, returning a fallback response instead. This protects both the downstream service (time to recover) and the calling application (remains responsive).
+
+**Vulnerable (no circuit breaker — cascading failure):**
+
+```typescript
+// ❌ Unbounded retries — amplifies downstream failures
+async function getRecommendations(userId: string): Promise<Product[]> {
+  // If recommendation-service is down, this retries forever
+  // Each request waits 30s (default timeout), blocking a thread
+  // 100 concurrent users = 100 blocked connections = app is frozen
+  while (true) {
+    try {
+      const res = await fetch(`http://recommendation-service/api/recommend/${userId}`)
+      return await res.json()
+    } catch {
+      // Retry immediately — hammers the failing service
+      await new Promise(r => setTimeout(r, 100))
+    }
+  }
+}
+
+// API handler blocks entirely when recommendations are unavailable
+app.get('/api/products', async (req, res) => {
+  const products = await getProducts()
+  const recommendations = await getRecommendations(req.user.id)  // Blocks forever
+  res.json({ products, recommendations })
+})
+```
+
+**Secure (circuit breaker with graceful fallback):**
+
+```typescript
+import CircuitBreaker from 'opossum'
+
+// ✅ Circuit breaker wraps the unreliable call
+const recommendationBreaker = new CircuitBreaker(
+  async (userId: string): Promise<Product[]> => {
+    const res = await fetch(`http://recommendation-service/api/recommend/${userId}`, {
+      signal: AbortSignal.timeout(3000),  // 3s timeout per request
+    })
+    if (!res.ok) throw new Error(`Service returned ${res.status}`)
+    return res.json()
+  },
+  {
+    timeout: 5000,           // Max 5s before considering a failure
+    errorThresholdPercentage: 50,  // Open circuit after 50% failures
+    resetTimeout: 30000,     // Try again after 30s
+    volumeThreshold: 5,      // Minimum 5 requests before calculating error rate
+  }
+)
+
+// ✅ Fallback returns cached/default data when circuit is open
+recommendationBreaker.fallback(async (userId: string) => {
+  // Return cached recommendations or popular items
+  const cached = await cache.get(`recommendations:${userId}`)
+  return cached ?? await getPopularProducts()
+})
+
+// ✅ API handler degrades gracefully — always responds
+app.get('/api/products', async (req, res) => {
+  const products = await getProducts()
+  const recommendations = await recommendationBreaker.fire(req.user.id)
+  res.json({ products, recommendations })  // Always returns, even if recommendations are fallback data
+})
+```
+
+Apply circuit breakers to every external service call (APIs, databases, caches). Always provide a fallback that lets the application continue functioning with degraded features rather than failing completely.
+
+Reference: [Microsoft Circuit Breaker Pattern](https://learn.microsoft.com/en-us/azure/architecture/patterns/circuit-breaker)
+
+---
+
+## Never Log Passwords, Tokens, or PII
+
+**Impact: MEDIUM — CWE-532**
+
+Log files are often stored with weaker access controls than production databases — aggregated in centralized logging systems, backed up to less secure storage, and accessible to broader engineering teams. Logging passwords, API keys, JWTs, credit card numbers, or PII gives attackers who gain access to logs a direct path to credentials and personal data. It also creates GDPR/PCI-DSS compliance violations.
+
+**Vulnerable (sensitive data in logs):**
+
+```typescript
+// ❌ Logging the entire request body — includes passwords and tokens
+app.post('/api/login', async (req, res) => {
+  logger.info('Login attempt', { body: req.body })
+  // Logs: { body: { email: "user@example.com", password: "MyS3cret!" } }
+
+  const user = await authenticate(req.body.email, req.body.password)
+  logger.info('Login successful', { user })
+  // Logs: { user: { id: 1, email: "user@example.com", ssn: "123-45-6789" } }
+})
+
+// ❌ Logging authorization headers — exposes JWT/API keys
+app.use((req, res, next) => {
+  logger.debug('Incoming request', {
+    url: req.url,
+    headers: req.headers,  // Includes Authorization: Bearer eyJhbGci...
+  })
+  next()
+})
+```
+
+**Secure (structured logging with redaction):**
+
+```typescript
+import pino from 'pino'
+
+// ✅ Configure logger with automatic redaction of sensitive fields
+const logger = pino({
+  redact: {
+    paths: [
+      'req.headers.authorization',
+      'req.headers.cookie',
+      'body.password',
+      'body.confirmPassword',
+      'body.token',
+      'body.creditCard',
+      'body.ssn',
+      'user.ssn',
+      'user.password',
+      '*.secret',
+      '*.apiKey',
+    ],
+    censor: '[REDACTED]',
+  },
+})
+
+// ✅ Log only safe, non-sensitive identifiers
+app.post('/api/login', async (req, res) => {
+  logger.info({ email: req.body.email }, 'Login attempt')
+  // Logs: { email: "user@example.com", msg: "Login attempt" }
+
+  const user = await authenticate(req.body.email, req.body.password)
+  logger.info({ userId: user.id, role: user.role }, 'Login successful')
+  // Logs: { userId: 1, role: "user", msg: "Login successful" }
+})
+
+// ✅ Mask PII helper for when logging is necessary
+function maskEmail(email: string): string {
+  const [local, domain] = email.split('@')
+  return `${local[0]}***@${domain}`  // "u***@example.com"
+}
+```
+
+Configure your logging framework to automatically redact sensitive fields. Never log `req.body` or `req.headers` without filtering. Use structured loggers (Pino, Winston) with built-in redaction support.
+
+Reference: [OWASP Logging Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html)
+
+---
 
 ## Never Expose Stack Traces or Internal Errors to Clients
 
@@ -1289,6 +1861,86 @@ process.on('unhandledRejection', (reason) => {
 In development, you can expose full error details. Use `NODE_ENV` to gate stack trace exposure. Never expose raw database errors — they reveal schema structure and query patterns.
 
 Reference: [OWASP Error Handling Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Error_Handling_Cheat_Sheet.html)
+
+---
+
+## Ensure Exception-Safe Resource Cleanup
+
+**Impact: MEDIUM — CWE-404**
+
+Resources like database connections, file handles, network sockets, and encryption contexts must be released even when exceptions occur. Leaked resources exhaust connection pools, fill file descriptor tables, and eventually crash the application. In high-traffic systems, a single missing `finally` block can cause a denial-of-service condition within hours as the connection pool drains to zero.
+
+**Vulnerable (resources leaked on exception):**
+
+```typescript
+// ❌ Database connection leaked if query throws
+async function getUserOrders(userId: string): Promise<Order[]> {
+  const connection = await pool.getConnection()
+  // If this query throws, the connection is never released
+  const orders = await connection.query('SELECT * FROM orders WHERE user_id = ?', [userId])
+  connection.release()  // Never reached on error!
+  return orders
+}
+
+// ❌ File handle leaked if processing throws
+async function processUpload(filePath: string): Promise<void> {
+  const handle = await fs.open(filePath, 'r')
+  const content = await handle.readFile('utf-8')
+  const parsed = JSON.parse(content)  // Throws on malformed JSON
+  await processData(parsed)
+  await handle.close()  // Never reached on error!
+}
+
+// ❌ Temporary file not cleaned up
+async function generateReport(data: ReportData): Promise<string> {
+  const tempPath = `/tmp/report-${Date.now()}.pdf`
+  await writePDF(tempPath, data)
+  const url = await uploadToS3(tempPath)  // If this throws, temp file remains on disk
+  await fs.unlink(tempPath)  // Never reached on error!
+  return url
+}
+```
+
+**Secure (exception-safe resource cleanup):**
+
+```typescript
+// ✅ try/finally ensures connection is always released
+async function getUserOrders(userId: string): Promise<Order[]> {
+  const connection = await pool.getConnection()
+  try {
+    const orders = await connection.query('SELECT * FROM orders WHERE user_id = ?', [userId])
+    return orders
+  } finally {
+    connection.release()  // Always runs, even on exception
+  }
+}
+
+// ✅ Using Symbol.asyncDispose (TC39 Explicit Resource Management)
+async function processUpload(filePath: string): Promise<void> {
+  await using handle = await fs.open(filePath, 'r')
+  // handle is automatically closed when scope exits, even on exception
+  const content = await handle.readFile('utf-8')
+  const parsed = JSON.parse(content)
+  await processData(parsed)
+}
+
+// ✅ Cleanup in finally for temporary files
+async function generateReport(data: ReportData): Promise<string> {
+  const tempPath = `/tmp/report-${Date.now()}.pdf`
+  try {
+    await writePDF(tempPath, data)
+    const url = await uploadToS3(tempPath)
+    return url
+  } finally {
+    // Clean up temp file regardless of success or failure
+    await fs.unlink(tempPath).catch(() => {})  // Ignore "file not found" errors
+  }
+}
+```
+
+Every resource acquisition must have a corresponding release in a `finally` block, `using` declaration, or equivalent. Audit code for connection `.getConnection()`, file `.open()`, and lock `.acquire()` calls without matching cleanup.
+
+Reference: [CWE-404: Improper Resource Shutdown or Release](https://cwe.mitre.org/data/definitions/404.html)
 
 ---
 
@@ -1378,9 +2030,10 @@ Reference: [OWASP Logging Cheat Sheet](https://cheatsheetseries.owasp.org/cheats
 
 ---
 
-## 6. Infrastructure & HTTP Hardening {#section-6}
+## 7. Infrastructure & HTTP Hardening {#section-7}
 
-**Impact:** UNKNOWN
+**Impact:** MEDIUM
+**Description:** Security headers, Content Security Policy, and least-privilege IAM roles provide defense-in-depth (OWASP A02) that limits the blast radius of other vulnerabilities.
 
 ## Implement a Strict Content Security Policy (CSP)
 
@@ -1637,9 +2290,10 @@ Reference: [OWASP Secure Headers Project](https://owasp.org/www-project-secure-h
 
 ---
 
-## 7. Input Validation & Injection Prevention {#section-7}
+## 8. Input Validation & Injection Prevention {#section-8}
 
-**Impact:** UNKNOWN
+**Impact:** CRITICAL
+**Description:** Injection vulnerabilities (SQL, command, XSS, XXE, deserialization, mass assignment) remain the most exploited class of flaws (OWASP A05). All untrusted data must be validated, sanitized, and escaped before use.
 
 ## Never Construct Shell Commands from User Input
 
@@ -1704,6 +2358,150 @@ function ping(host: string) {
 If you need shell features (pipes, redirects), use them in static scripts and pass only validated data as arguments. Never allow user input to reach the shell command string itself.
 
 Reference: [OWASP Command Injection](https://owasp.org/www-community/attacks/Command_Injection)
+
+---
+
+## Avoid Unsafe Deserialization of Untrusted Data
+
+**Impact: CRITICAL — CWE-502**
+
+Unsafe deserialization converts attacker-controlled bytes or strings into live objects, potentially executing arbitrary code, escalating privileges, or corrupting application state. In JavaScript/Node.js, this manifests as prototype pollution via `JSON.parse` of unvalidated input, `eval`-based deserializers, or libraries like `node-serialize` that execute functions during deserialization. In Java, `ObjectInputStream` on untrusted data has caused some of the most severe RCE vulnerabilities in history.
+
+**Vulnerable (unsafe deserialization):**
+
+```typescript
+// ❌ node-serialize executes functions embedded in serialized data
+import { unserialize } from 'node-serialize'
+
+app.post('/api/session', (req, res) => {
+  // Attacker sends: {"rce":"_$$ND_FUNC$$_function(){require('child_process').exec('rm -rf /')}()"}
+  const session = unserialize(req.body.data)
+  res.json(session)
+})
+
+// ❌ eval-based deserialization
+function parseConfig(raw: string): Config {
+  return eval('(' + raw + ')')  // Executes arbitrary code!
+}
+
+// ❌ Unvalidated JSON.parse — prototype pollution
+const userInput = JSON.parse(body)
+// If body = '{"__proto__":{"isAdmin":true}}', every object now has isAdmin=true
+Object.assign(defaults, userInput)
+```
+
+**Secure (safe deserialization with validation):**
+
+```typescript
+import { z } from 'zod'
+
+// ✅ Parse JSON then immediately validate against a strict schema
+const SessionSchema = z.object({
+  userId: z.string().uuid(),
+  role: z.enum(['user', 'admin']),
+  expiresAt: z.string().datetime(),
+})
+
+app.post('/api/session', (req, res) => {
+  const parsed = SessionSchema.safeParse(req.body)
+  if (!parsed.success) {
+    return res.status(400).json({ error: 'Invalid session data' })
+  }
+  // parsed.data is typed and validated — no extra properties
+  res.json(parsed.data)
+})
+
+// ✅ Prevent prototype pollution with Object.create(null) or explicit property checks
+function safeMerge(target: Record<string, unknown>, source: Record<string, unknown>) {
+  for (const key of Object.keys(source)) {
+    if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
+      continue  // Block prototype pollution vectors
+    }
+    target[key] = source[key]
+  }
+  return target
+}
+```
+
+Never use `eval`, `Function()`, `node-serialize`, or `vm.runInNewContext` on untrusted input. Always validate deserialized data against a strict schema with an explicit allowlist of expected fields.
+
+Reference: [OWASP Deserialization Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Deserialization_Cheat_Sheet.html)
+
+---
+
+## Prevent Mass Assignment by Using Explicit Field Allowlists
+
+**Impact: HIGH — CWE-915**
+
+Mass assignment occurs when an application directly binds user input to model objects without filtering. An attacker can inject extra fields in the request body — like `role: "admin"`, `price: 0`, or `isVerified: true` — that the ORM dutifully writes to the database. This is a direct path to privilege escalation, financial fraud, and data corruption. Always use explicit allowlists of updatable fields.
+
+**Vulnerable (direct binding of request body to model):**
+
+```typescript
+// ❌ Spreading the entire request body into the database update
+app.put('/api/users/:id', async (req, res) => {
+  // Attacker sends: { name: "Legit", role: "admin", isVerified: true }
+  // ORM writes ALL fields, including role and isVerified
+  const user = await db.users.update(req.params.id, req.body)
+  res.json(user)
+})
+
+// ❌ Sequelize: passing req.body directly to create
+app.post('/api/products', async (req, res) => {
+  // Attacker sends: { name: "Widget", price: 0, sellerId: "other-user-id" }
+  const product = await Product.create(req.body)  // Creates product with price=0
+  res.json(product)
+})
+
+// ❌ Mongoose: no field filtering
+app.patch('/api/settings', async (req, res) => {
+  // Attacker sends: { theme: "dark", creditBalance: 99999 }
+  await Settings.findByIdAndUpdate(req.user.settingsId, req.body)
+  res.json({ success: true })
+})
+```
+
+**Secure (explicit field allowlists):**
+
+```typescript
+import { z } from 'zod'
+
+// ✅ Define exactly which fields the user can update
+const UpdateUserSchema = z.object({
+  name: z.string().min(1).max(100),
+  email: z.string().email(),
+  avatar: z.string().url().optional(),
+  // role, isVerified, isAdmin are NOT in the schema — silently stripped
+})
+
+app.put('/api/users/:id', async (req, res) => {
+  // Zod strips all fields not in the schema
+  const data = UpdateUserSchema.parse(req.body)
+  // data = { name: "Legit", email: "user@example.com" }
+  // role, isVerified, and any injected fields are gone
+  const user = await db.users.update(req.params.id, data)
+  res.json(user)
+})
+
+// ✅ Alternative: pick specific fields explicitly
+app.patch('/api/settings', async (req, res) => {
+  const allowedFields = ['theme', 'language', 'timezone', 'notifications'] as const
+  const safeUpdate: Record<string, unknown> = {}
+
+  for (const field of allowedFields) {
+    if (req.body[field] !== undefined) {
+      safeUpdate[field] = req.body[field]
+    }
+  }
+
+  await Settings.findByIdAndUpdate(req.user.settingsId, safeUpdate)
+  res.json({ success: true })
+})
+```
+
+Never pass `req.body` directly to ORM `.create()`, `.update()`, or `.findByIdAndUpdate()`. Always filter through a schema (Zod, Joi) or an explicit allowlist of permitted fields. Define separate schemas for creation vs. update to prevent field escalation.
+
+Reference: [OWASP Mass Assignment Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Mass_Assignment_Cheat_Sheet.html)
 
 ---
 
@@ -2028,9 +2826,10 @@ Reference: [OWASP XSS Prevention Cheat Sheet](https://cheatsheetseries.owasp.org
 
 ---
 
-## 8. Static Application Security Testing & Code Analysis {#section-8}
+## 9. Static Application Security Testing & Code Analysis {#section-9}
 
-**Impact:** UNKNOWN
+**Impact:** HIGH
+**Description:** SAST tools (SonarQube, Semgrep, CodeQL) analyse source code for security flaws without executing it. They catch injection patterns, hardcoded secrets, insecure APIs, and code quality issues before code reaches production. Integrate in CI and as pre-merge gates.
 
 ## Enable GitHub CodeQL for Automated Vulnerability Discovery
 
@@ -2480,9 +3279,10 @@ Reference: [SonarQube Security Rules](https://rules.sonarsource.com/typescript/t
 
 ---
 
-## 9. Software Composition Analysis & CVE Scanning {#section-9}
+## 10. Software Composition Analysis & CVE Scanning {#section-10}
 
-**Impact:** UNKNOWN
+**Impact:** CRITICAL
+**Description:** SCA tools (JFrog Xray, OWASP Dependency Check, Trivy) scan every dependency and container layer for known CVEs (OWASP A03). HIGH and CRITICAL findings must block the build pipeline. Integrate scanning at every stage: developer local, PR, CI, and registry/artifact level.
 
 ## Block Builds When HIGH or CRITICAL CVE Versions Are Detected
 
@@ -3109,9 +3909,10 @@ Reference: [Trivy Documentation](https://aquasecurity.github.io/trivy/)
 
 ---
 
-## 10. Secrets & Credentials Management {#section-10}
+## 11. Secrets & Credentials Management {#section-11}
 
-**Impact:** UNKNOWN
+**Impact:** CRITICAL
+**Description:** Leaked credentials are the fastest path to a breach (OWASP A04). Secrets must never appear in source code, logs, or unencrypted storage. Rotation and scanning must be automated.
 
 ## Use a Secrets Manager Instead of Plain Environment Files
 
@@ -3244,6 +4045,71 @@ const stripeKey = await getSecret('prod/stripe/secret-key')
 Add `.env` to `.gitignore`. Use `.env.example` with placeholder values for documentation. Rotate any secret that has been committed — treat it as compromised immediately.
 
 Reference: [OWASP Secrets Management Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Secrets_Management_Cheat_Sheet.html)
+
+---
+
+## Implement and Test Automatic Secret Rotation
+
+**Impact: HIGH — CWE-798**
+
+Static secrets that never change give attackers an unlimited window of exploitation after compromise. If a database password or API key is leaked, it remains valid indefinitely unless rotated. Automatic rotation limits the blast radius of credential leaks by ensuring secrets expire and are replaced on a regular schedule. The rotation process must be zero-downtime — both old and new credentials must work during the transition window.
+
+**Vulnerable (static secrets with no rotation):**
+
+```typescript
+// ❌ Hardcoded API key — never rotated, valid forever after leak
+const STRIPE_KEY = process.env.STRIPE_SECRET_KEY
+// This key was set 18 months ago and never changed
+// If leaked via logs, git history, or memory dump, attacker has permanent access
+
+// ❌ Database password — manual rotation causes downtime
+// .env file:
+// DB_PASSWORD=production_password_2024
+// Changed manually once a year — requires app restart
+// No overlap period — old password stops working immediately
+```
+
+**Secure (automated rotation with overlap period):**
+
+```typescript
+// ✅ AWS Secrets Manager with automatic rotation
+import { SecretsManagerClient, GetSecretValueCommand } from '@aws-sdk/client-secrets-manager'
+
+const client = new SecretsManagerClient({ region: 'us-east-1' })
+
+// Fetch the current secret on every use — always gets the latest rotated value
+async function getDbCredentials(): Promise<{ username: string; password: string }> {
+  const result = await client.send(
+    new GetSecretValueCommand({
+      SecretId: 'prod/database/credentials',
+      VersionStage: 'AWSCURRENT',  // Always the current, rotated version
+    })
+  )
+  return JSON.parse(result.SecretString!)
+}
+
+// ✅ Connection pool that refreshes credentials on authentication failure
+async function createPool() {
+  const creds = await getDbCredentials()
+  const pool = new Pool({
+    user: creds.username,
+    password: creds.password,
+    host: process.env.DB_HOST,
+    // On auth failure, refresh credentials (rotation may have occurred)
+    connectionErrorHandler: async (err) => {
+      if (err.message.includes('authentication failed')) {
+        const newCreds = await getDbCredentials()
+        pool.options.password = newCreds.password
+      }
+    },
+  })
+  return pool
+}
+```
+
+Configure secret rotation schedules (30-90 days for passwords, 7 days for API keys). Test rotation in staging regularly — a rotation mechanism that has never been tested will fail in production.
+
+Reference: [AWS Secrets Manager Rotation](https://docs.aws.amazon.com/secretsmanager/latest/userguide/rotating-secrets.html)
 
 ---
 

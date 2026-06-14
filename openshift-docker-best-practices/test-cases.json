@@ -1,8 +1,161 @@
 {
-  "generated": "2026-06-14T07:05:17.962Z",
+  "generated": "2026-06-14T09:12:11.822Z",
   "skill": "openshift-docker-best-practices",
-  "total": 4,
+  "total": 20,
   "testCases": [
+    {
+      "skill": "openshift-docker-best-practices",
+      "rule": "cicd-image-scanning",
+      "title": "Scan container images for vulnerabilities in CI/CD pipelines",
+      "impact": "HIGH",
+      "tags": [
+        "security",
+        "docker",
+        "cicd",
+        "vulnerability-scanning",
+        "trivy",
+        "supply-chain"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "yaml",
+            "code": "# ❌ GitHub Actions pipeline that builds and deploys without any security scanning\nname: Build and Deploy\non:\n  push:\n    branches: [main]\n\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n\n      - name: Build image\n        run: docker build -t registry.example.com/app:${{ github.sha }} .\n\n      # No scanning step — CVEs ship directly to production!\n\n      - name: Push image\n        run: docker push registry.example.com/app:${{ github.sha }}\n\n      - name: Deploy to OpenShift\n        run: oc set image deployment/app app=registry.example.com/app:${{ github.sha }}"
+          },
+          "correct": {
+            "lang": "yaml",
+            "code": "# ✅ GitHub Actions pipeline with Trivy vulnerability scanning\nname: Build, Scan, and Deploy\non:\n  push:\n    branches: [main]\n\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n\n      - name: Build image\n        run: docker build -t registry.example.com/app:${{ github.sha }} .\n\n      # ✅ Scan the image for OS and library vulnerabilities\n      - name: Scan image with Trivy\n        uses: aquasecurity/trivy-action@master\n        with:\n          image-ref: registry.example.com/app:${{ github.sha }}\n          format: table\n          exit-code: 1               # Fail the build if vulnerabilities found\n          severity: CRITICAL,HIGH     # Only fail on CRITICAL and HIGH CVEs\n          ignore-unfixed: true        # Skip CVEs with no available fix\n\n      - name: Push image\n        run: docker push registry.example.com/app:${{ github.sha }}\n\n      - name: Deploy to OpenShift\n        run: oc set image deployment/app app=registry.example.com/app:${{ github.sha }}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "openshift-docker-best-practices",
+      "rule": "deploy-health-gates",
+      "title": "Use minReadySeconds and progress deadlines to prevent bad rollouts",
+      "impact": "MEDIUM",
+      "tags": [
+        "kubernetes",
+        "openshift",
+        "deployment",
+        "rollout",
+        "minready",
+        "progress-deadline"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "yaml",
+            "code": "# ❌ No minReadySeconds — pods counted as available the instant readiness probe passes\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: user-service\nspec:\n  replicas: 3\n  strategy:\n    type: RollingUpdate\n    rollingUpdate:\n      maxSurge: 1\n      maxUnavailable: 0\n  # No progressDeadlineSeconds — rollout can hang forever\n  template:\n    spec:\n      containers:\n        - name: user-service\n          image: registry.example.com/users:3.0.0\n          # Pod passes readiness at t=0, crashes at t=8s\n          # Kubernetes counts it as available, terminates the next old pod\n          # New pod crashes → another old pod terminated → cascading failure"
+          },
+          "correct": {
+            "lang": "yaml",
+            "code": "# ✅ Rollout safeguards prevent bad versions from being fully deployed\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: user-service\nspec:\n  replicas: 3\n  minReadySeconds: 15              # Pod must stay Ready for 15s before counting as Available\n  progressDeadlineSeconds: 120      # Rollout must complete within 2 minutes or is marked Failed\n  strategy:\n    type: RollingUpdate\n    rollingUpdate:\n      maxSurge: 1\n      maxUnavailable: 0\n  template:\n    spec:\n      containers:\n        - name: user-service\n          image: registry.example.com/users:3.0.0\n          readinessProbe:\n            httpGet:\n              path: /health/ready\n              port: 8080\n            initialDelaySeconds: 5\n            periodSeconds: 5\n          livenessProbe:\n            httpGet:\n              path: /health/live\n              port: 8080\n            initialDelaySeconds: 15\n            periodSeconds: 10"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "openshift-docker-best-practices",
+      "rule": "deploy-rolling-update",
+      "title": "Configure rolling update strategy with PodDisruptionBudgets for zero-downtime deployments",
+      "impact": "HIGH",
+      "tags": [
+        "kubernetes",
+        "openshift",
+        "rolling-update",
+        "deployment-strategy",
+        "pdb",
+        "zero-downtime"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "yaml",
+            "code": "# ❌ Recreate strategy — all pods killed before new ones start = downtime\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: payment-api\nspec:\n  replicas: 3\n  strategy:\n    type: Recreate         # All 3 pods terminated simultaneously\n  template:\n    spec:\n      containers:\n        - name: payment-api\n          image: registry.example.com/payment:1.0.0\n# During deployment:\n#   1. All 3 pods are terminated\n#   2. 0 pods running — application DOWN\n#   3. New pods start and become ready\n#   4. Application UP again — downtime: 30s to 5min+"
+          },
+          "correct": {
+            "lang": "yaml",
+            "code": "# ✅ RollingUpdate ensures at least N pods are always running\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: payment-api\nspec:\n  replicas: 3\n  strategy:\n    type: RollingUpdate\n    rollingUpdate:\n      maxSurge: 1          # Create 1 extra pod during rollout (4 total max)\n      maxUnavailable: 0     # Never reduce below desired replica count\n  template:\n    spec:\n      containers:\n        - name: payment-api\n          image: registry.example.com/payment:2.0.0\n          readinessProbe:\n            httpGet:\n              path: /health/ready\n              port: 8080\n            periodSeconds: 5\n\n---\n# ✅ PDB protects against node drains and cluster maintenance\napiVersion: policy/v1\nkind: PodDisruptionBudget\nmetadata:\n  name: payment-api-pdb\nspec:\n  minAvailable: 2           # At least 2 of 3 pods must always be running\n  selector:\n    matchLabels:\n      app: payment-api"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "openshift-docker-best-practices",
+      "rule": "docker-ignore-file",
+      "title": "Use .dockerignore to exclude unnecessary files from build context",
+      "impact": "MEDIUM",
+      "tags": [
+        "docker",
+        "dockerignore",
+        "build-context",
+        "performance",
+        "security"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "dockerfile",
+            "code": "# ❌ Without .dockerignore, COPY . . includes everything:\n#   .git/          — 100-500MB of version history\n#   node_modules/  — redundant, will be reinstalled\n#   .env           — contains DATABASE_URL, API_KEY secrets!\n#   test/          — test files not needed in production\n#   *.md           — documentation not needed in production\nFROM node:22-alpine\nWORKDIR /app\nCOPY . .\nRUN npm ci --omit=dev\nCMD [\"node\", \"server.js\"]\n# .env file with secrets is now baked into the image layer!"
+          },
+          "correct": {
+            "lang": "text",
+            "code": "# ✅ .dockerignore — exclude unnecessary and sensitive files\n# Version control\n.git\n.gitignore\n\n# Dependencies (will be installed fresh in the image)\nnode_modules\nvendor\n\n# Environment and secrets\n.env\n.env.*\n*.pem\n*.key\n\n# IDE and editor config\n.idea\n.vscode\n*.swp\n*.swo\n\n# Tests and docs (not needed in production)\ntest/\ntests/\n__tests__/\n*.test.js\n*.spec.js\n*.md\nLICENSE\nCHANGELOG.md\n\n# Build artifacts and CI\ndocker-compose*.yml\nDockerfile*\n.dockerignore\n.github\ncoverage/\ndist/"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "openshift-docker-best-practices",
+      "rule": "docker-layer-caching",
+      "title": "Order Dockerfile instructions to maximize layer caching",
+      "impact": "MEDIUM",
+      "tags": [
+        "docker",
+        "layer-caching",
+        "build-performance",
+        "optimization"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "dockerfile",
+            "code": "# ❌ COPY . . before dependency install — any code change re-runs npm install\nFROM node:22-alpine\nWORKDIR /app\n\n# This copies EVERYTHING — including source code\nCOPY . .\n\n# npm install runs on every build, even if only a .js file changed\nRUN npm install\n\nEXPOSE 8080\nCMD [\"node\", \"server.js\"]"
+          },
+          "correct": {
+            "lang": "dockerfile",
+            "code": "# ✅ Copy dependency manifests first, then install, then copy source code\nFROM node:22-alpine\nWORKDIR /app\n\n# Step 1: Copy only dependency files (changes rarely)\nCOPY package.json package-lock.json ./\n\n# Step 2: Install dependencies (cached unless package files change)\nRUN npm ci --omit=dev\n\n# Step 3: Copy source code (changes frequently, but doesn't bust dependency cache)\nCOPY . .\n\nEXPOSE 8080\nUSER 1001\nCMD [\"node\", \"server.js\"]\n\n# ✅ Same pattern for Java/Gradle:\n# COPY build.gradle.kts settings.gradle.kts ./\n# COPY gradle ./gradle\n# RUN ./gradlew dependencies --no-daemon\n# COPY src ./src\n# RUN ./gradlew bootJar --no-daemon"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "openshift-docker-best-practices",
+      "rule": "docker-minimal-base",
+      "title": "Use minimal or distroless base images for production",
+      "impact": "HIGH",
+      "tags": [
+        "docker",
+        "base-image",
+        "distroless",
+        "alpine",
+        "security",
+        "image-size"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "dockerfile",
+            "code": "# ❌ Full Ubuntu image — ~600MB+ with shell, package manager, and hundreds of tools\nFROM ubuntu:24.04\n\nRUN apt-get update && apt-get install -y \\\n    openjdk-21-jdk \\\n    curl \\\n    wget \\\n    vim \\\n    net-tools \\\n    && rm -rf /var/lib/apt/lists/*\n\nCOPY target/app.jar /app/app.jar\nWORKDIR /app\n\n# Shell, curl, wget, vim are all available to an attacker\nCMD [\"java\", \"-jar\", \"app.jar\"]"
+          },
+          "correct": {
+            "lang": "dockerfile",
+            "code": "# ✅ Option 1: Distroless — no shell, no package manager, ~100MB\nFROM eclipse-temurin:21-jdk-alpine AS build\nWORKDIR /app\nCOPY . .\nRUN ./gradlew bootJar\n\nFROM gcr.io/distroless/java21-debian12\nCOPY --from=build /app/build/libs/app.jar /app/app.jar\nWORKDIR /app\nUSER 1001\nENTRYPOINT [\"java\", \"-jar\", \"app.jar\"]\n\n# ✅ Option 2: JRE-only Alpine — minimal shell, ~120MB\n# FROM eclipse-temurin:21-jre-alpine\n# COPY --from=build /app/build/libs/app.jar /app/app.jar\n# USER 1001\n# ENTRYPOINT [\"java\", \"-jar\", \"app.jar\"]"
+          }
+        }
+      ]
+    },
     {
       "skill": "openshift-docker-best-practices",
       "rule": "docker-multi-stage",
@@ -25,6 +178,56 @@
           "correct": {
             "lang": "dockerfile",
             "code": "# ✅ Stage 1: Build Environment (heavy, contains tools)\nFROM maven:3.9-eclipse-temurin-17 AS builder\nWORKDIR /app\nCOPY pom.xml .\n# Cache dependencies\nRUN mvn dependency:go-offline\nCOPY src ./src\nRUN mvn clean package -DskipTests\n\n# ✅ Stage 2: Minimal Production Runtime (JRE only, no source code)\nFROM eclipse-temurin:17-jre-alpine\nWORKDIR /app\n\n# Copy ONLY the compiled artifact from the builder stage\nCOPY --from=builder /app/target/myapp.jar ./myapp.jar\n\n# Apply OpenShift SCC permissions\nRUN chgrp -R 0 /app && chmod -R g=u /app\nUSER 1001\n\nCMD [\"java\", \"-jar\", \"myapp.jar\"]"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "openshift-docker-best-practices",
+      "rule": "docker-pin-versions",
+      "title": "Pin base image versions instead of using latest tag",
+      "impact": "HIGH",
+      "tags": [
+        "docker",
+        "base-image",
+        "versioning",
+        "reproducibility",
+        "security"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "dockerfile",
+            "code": "# ❌ latest tag resolves to a different image on every pull\nFROM node:latest\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci --omit=dev\nCOPY . .\nRUN npm run build\nEXPOSE 3000\nCMD [\"node\", \"dist/server.js\"]"
+          },
+          "correct": {
+            "lang": "dockerfile",
+            "code": "# ✅ Pin to an exact version and minimal variant\nFROM node:22.5.1-alpine3.20 AS build\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci --omit=dev\nCOPY . .\nRUN npm run build\n\n# ✅ Or pin by digest for maximum reproducibility\nFROM node@sha256:a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2 AS runtime\nWORKDIR /app\nCOPY --from=build /app/dist ./dist\nCOPY --from=build /app/node_modules ./node_modules\nEXPOSE 3000\nCMD [\"node\", \"dist/server.js\"]"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "openshift-docker-best-practices",
+      "rule": "k8s-graceful-shutdown",
+      "title": "Handle SIGTERM for graceful shutdown during pod termination",
+      "impact": "HIGH",
+      "tags": [
+        "kubernetes",
+        "openshift",
+        "graceful-shutdown",
+        "sigterm",
+        "lifecycle"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "yaml",
+            "code": "# ❌ No graceful shutdown handling — requests fail during rollouts\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: order-service\nspec:\n  template:\n    spec:\n      # Default terminationGracePeriodSeconds: 30\n      containers:\n        - name: order-service\n          image: registry.example.com/orders:1.0.0\n          # No lifecycle hooks\n          # App doesn't handle SIGTERM:\n          #   - In-flight requests get connection reset\n          #   - Database transactions are interrupted\n          #   - Message queue consumers lose uncommitted messages"
+          },
+          "correct": {
+            "lang": "yaml",
+            "code": "# ✅ Graceful shutdown with proper lifecycle management\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: order-service\nspec:\n  template:\n    spec:\n      terminationGracePeriodSeconds: 60    # Give the app 60s to drain\n      containers:\n        - name: order-service\n          image: registry.example.com/orders:2.0.0\n          lifecycle:\n            preStop:\n              exec:\n                command:\n                  - /bin/sh\n                  - -c\n                  # Wait for the pod to be removed from Service endpoints\n                  # before starting application shutdown\n                  - sleep 5\n          # Spring Boot: set graceful shutdown in application.yml:\n          #   server.shutdown: graceful\n          #   spring.lifecycle.timeout-per-shutdown-phase: 30s\n          #\n          # Node.js: handle SIGTERM in code:\n          #   process.on('SIGTERM', () => {\n          #     server.close(() => process.exit(0));\n          #   });"
           }
         }
       ]
@@ -85,6 +288,107 @@
     },
     {
       "skill": "openshift-docker-best-practices",
+      "rule": "k8s-startup-probe",
+      "title": "Use startup probes for slow-starting applications",
+      "impact": "MEDIUM",
+      "tags": [
+        "kubernetes",
+        "openshift",
+        "startup-probe",
+        "spring-boot",
+        "health-checks"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "yaml",
+            "code": "# ❌ Liveness probe starts immediately and kills the pod during Spring Boot init\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: inventory-service\nspec:\n  replicas: 2\n  selector:\n    matchLabels:\n      app: inventory-service\n  template:\n    metadata:\n      labels:\n        app: inventory-service\n    spec:\n      containers:\n        - name: inventory-service\n          image: registry.example.com/inventory-service:1.4.0\n          ports:\n            - containerPort: 8080\n          livenessProbe:\n            httpGet:\n              path: /actuator/health/liveness\n              port: 8080\n            initialDelaySeconds: 5\n            periodSeconds: 10\n            failureThreshold: 3"
+          },
+          "correct": {
+            "lang": "yaml",
+            "code": "# ✅ Startup probe allows up to 60s for init before liveness kicks in\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: inventory-service\nspec:\n  replicas: 2\n  selector:\n    matchLabels:\n      app: inventory-service\n  template:\n    metadata:\n      labels:\n        app: inventory-service\n    spec:\n      containers:\n        - name: inventory-service\n          image: registry.example.com/inventory-service:1.4.0\n          ports:\n            - containerPort: 8080\n          startupProbe:\n            httpGet:\n              path: /actuator/health/liveness\n              port: 8080\n            failureThreshold: 30\n            periodSeconds: 2\n          livenessProbe:\n            httpGet:\n              path: /actuator/health/liveness\n              port: 8080\n            periodSeconds: 10\n            failureThreshold: 3\n          readinessProbe:\n            httpGet:\n              path: /actuator/health/readiness\n              port: 8080\n            periodSeconds: 5\n            failureThreshold: 3"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "openshift-docker-best-practices",
+      "rule": "net-network-policy",
+      "title": "Define NetworkPolicies for default-deny and least-privilege network access",
+      "impact": "HIGH",
+      "tags": [
+        "kubernetes",
+        "openshift",
+        "network-policy",
+        "security",
+        "zero-trust"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "yaml",
+            "code": "# ❌ No NetworkPolicy in the namespace — any pod can reach any other pod\napiVersion: v1\nkind: Namespace\nmetadata:\n  name: production\n# Without NetworkPolicies:\n#   - Compromised frontend pod can directly query the database\n#   - Any pod can scan the internal network\n#   - Lateral movement is trivial for attackers"
+          },
+          "correct": {
+            "lang": "yaml",
+            "code": "# ✅ Step 1: Default deny ALL ingress traffic in the namespace\napiVersion: networking.k8s.io/v1\nkind: NetworkPolicy\nmetadata:\n  name: default-deny-ingress\n  namespace: production\nspec:\n  podSelector: {}        # Applies to ALL pods in the namespace\n  policyTypes:\n    - Ingress             # Deny all incoming traffic by default\n\n---\n# ✅ Step 2: Allow specific traffic — frontend → backend on port 8080 only\napiVersion: networking.k8s.io/v1\nkind: NetworkPolicy\nmetadata:\n  name: allow-frontend-to-backend\n  namespace: production\nspec:\n  podSelector:\n    matchLabels:\n      app: backend-api\n  ingress:\n    - from:\n        - podSelector:\n            matchLabels:\n              app: frontend          # Only frontend pods can reach backend\n      ports:\n        - protocol: TCP\n          port: 8080                 # Only on port 8080\n\n---\n# ✅ Step 3: Allow backend → database on port 5432 only\napiVersion: networking.k8s.io/v1\nkind: NetworkPolicy\nmetadata:\n  name: allow-backend-to-database\n  namespace: production\nspec:\n  podSelector:\n    matchLabels:\n      app: postgres\n  ingress:\n    - from:\n        - podSelector:\n            matchLabels:\n              app: backend-api       # Only backend can reach the database\n      ports:\n        - protocol: TCP\n          port: 5432"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "openshift-docker-best-practices",
+      "rule": "net-service-exposure",
+      "title": "Use appropriate service types and configure TLS for external traffic",
+      "impact": "MEDIUM",
+      "tags": [
+        "kubernetes",
+        "openshift",
+        "service",
+        "route",
+        "ingress",
+        "tls"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "yaml",
+            "code": "# ❌ NodePort exposes the service on every node's IP — no TLS, no access control\napiVersion: v1\nkind: Service\nmetadata:\n  name: api-service\nspec:\n  type: NodePort           # Exposed on a random high port on every node\n  selector:\n    app: api-server\n  ports:\n    - port: 8080\n      targetPort: 8080\n      nodePort: 30080       # Accessible at http://<any-node-ip>:30080\n# Traffic is unencrypted\n# No rate limiting, WAF, or access control\n# Port must be opened in firewall on every node"
+          },
+          "correct": {
+            "lang": "yaml",
+            "code": "# ✅ Internal service — ClusterIP (default, not accessible from outside)\napiVersion: v1\nkind: Service\nmetadata:\n  name: api-service\nspec:\n  type: ClusterIP           # Only accessible within the cluster\n  selector:\n    app: api-server\n  ports:\n    - port: 8080\n      targetPort: 8080\n\n---\n# ✅ OpenShift Route with edge TLS termination\napiVersion: route.openshift.io/v1\nkind: Route\nmetadata:\n  name: api-route\nspec:\n  to:\n    kind: Service\n    name: api-service\n  port:\n    targetPort: 8080\n  tls:\n    termination: edge                     # TLS terminated at the router\n    insecureEdgeTerminationPolicy: Redirect  # HTTP → HTTPS redirect\n\n# Alternative: Kubernetes Ingress with cert-manager TLS\n# apiVersion: networking.k8s.io/v1\n# kind: Ingress\n# metadata:\n#   name: api-ingress\n#   annotations:\n#     cert-manager.io/cluster-issuer: letsencrypt-prod\n# spec:\n#   tls:\n#     - hosts: [api.example.com]\n#       secretName: api-tls-cert\n#   rules:\n#     - host: api.example.com\n#       http:\n#         paths:\n#           - path: /\n#             pathType: Prefix\n#             backend:\n#               service:\n#                 name: api-service\n#                 port:\n#                   number: 8080"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "openshift-docker-best-practices",
+      "rule": "scc-drop-capabilities",
+      "title": "Drop all Linux capabilities and add only what is needed",
+      "impact": "HIGH",
+      "tags": [
+        "openshift",
+        "kubernetes",
+        "security",
+        "capabilities",
+        "least-privilege"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "yaml",
+            "code": "# ❌ No capabilities block — container retains default capabilities including NET_RAW\napiVersion: v1\nkind: Pod\nmetadata:\n  name: api-server\nspec:\n  containers:\n    - name: api-server\n      image: registry.example.com/api:2.1.0\n      ports:\n        - containerPort: 8080\n      securityContext:\n        runAsNonRoot: true\n        # No capabilities block — defaults include:\n        # NET_RAW (ARP spoofing), MKNOD (device creation),\n        # AUDIT_WRITE, FOWNER, SETUID, SETGID, etc."
+          },
+          "correct": {
+            "lang": "yaml",
+            "code": "# ✅ Drop ALL capabilities, add back only the minimum required\napiVersion: v1\nkind: Pod\nmetadata:\n  name: api-server\nspec:\n  containers:\n    - name: api-server\n      image: registry.example.com/api:2.1.0\n      ports:\n        - containerPort: 8080\n      securityContext:\n        runAsNonRoot: true\n        allowPrivilegeEscalation: false\n        capabilities:\n          drop:\n            - ALL          # Remove every Linux capability\n          # Only add back capabilities if absolutely required:\n          # add:\n          #   - NET_BIND_SERVICE  # Only if binding to ports < 1024"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "openshift-docker-best-practices",
       "rule": "scc-non-root",
       "title": "Ensure containers run without root privileges (OpenShift SCC)",
       "impact": "CRITICAL",
@@ -106,6 +410,107 @@
           "correct": {
             "lang": "dockerfile",
             "code": "FROM node:22-alpine\nWORKDIR /app\n\nCOPY package*.json ./\nRUN npm ci --omit=dev\nCOPY . .\n\n# ✅ Bind to an unprivileged port\nENV PORT=8080\nEXPOSE 8080\n\n# ✅ OpenShift assigns a random UID, but always uses GID 0 (root group).\n# We must ensure GID 0 can read and write necessary directories.\nRUN chgrp -R 0 /app && \\\n    chmod -R g=u /app\n\n# ✅ Explicitly set a non-root user (good practice, though OpenShift will override the UID)\nUSER 1001\n\nCMD [\"node\", \"server.js\"]"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "openshift-docker-best-practices",
+      "rule": "scc-readonly-fs",
+      "title": "Use read-only root filesystem to prevent runtime tampering",
+      "impact": "HIGH",
+      "tags": [
+        "openshift",
+        "kubernetes",
+        "security",
+        "readonly-filesystem",
+        "immutable"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "yaml",
+            "code": "# ❌ No readOnlyRootFilesystem — attacker can modify any file in the container\napiVersion: v1\nkind: Pod\nmetadata:\n  name: web-app\nspec:\n  containers:\n    - name: web-app\n      image: registry.example.com/webapp:3.0.0\n      securityContext:\n        runAsNonRoot: true\n        # Root filesystem is writable by default\n        # An attacker could:\n        #   - Replace /app/server.js with a backdoor\n        #   - Write cron jobs or scripts to /tmp\n        #   - Install tools via package managers"
+          },
+          "correct": {
+            "lang": "yaml",
+            "code": "# ✅ Immutable root filesystem with only necessary writable directories\napiVersion: v1\nkind: Pod\nmetadata:\n  name: web-app\nspec:\n  containers:\n    - name: web-app\n      image: registry.example.com/webapp:3.0.0\n      securityContext:\n        runAsNonRoot: true\n        readOnlyRootFilesystem: true     # Make the entire root filesystem read-only\n        allowPrivilegeEscalation: false\n        capabilities:\n          drop: [ALL]\n      volumeMounts:\n        - name: tmp\n          mountPath: /tmp                # Application temp files\n        - name: cache\n          mountPath: /var/cache          # Cache directory if needed\n  volumes:\n    - name: tmp\n      emptyDir:\n        sizeLimit: 100Mi                 # Limit temp disk usage\n    - name: cache\n      emptyDir:\n        sizeLimit: 200Mi"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "openshift-docker-best-practices",
+      "rule": "scc-security-context",
+      "title": "Configure SecurityContext to enforce non-root and prevent privilege escalation",
+      "impact": "CRITICAL",
+      "tags": [
+        "openshift",
+        "kubernetes",
+        "security-context",
+        "non-root",
+        "privilege-escalation"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "yaml",
+            "code": "# ❌ No securityContext defined — container runs as root with privilege escalation allowed\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: my-app\n  labels:\n    app: my-app\nspec:\n  replicas: 2\n  selector:\n    matchLabels:\n      app: my-app\n  template:\n    metadata:\n      labels:\n        app: my-app\n    spec:\n      containers:\n        - name: my-app\n          image: registry.example.com/my-app:1.4.0\n          ports:\n            - containerPort: 8080\n          # No securityContext — defaults to root (UID 0)\n          # allowPrivilegeEscalation defaults to true\n          # No seccomp profile applied"
+          },
+          "correct": {
+            "lang": "yaml",
+            "code": "# ✅ SecurityContext configured at both pod and container level for restricted-v2 SCC compliance\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: my-app\n  labels:\n    app: my-app\nspec:\n  replicas: 2\n  selector:\n    matchLabels:\n      app: my-app\n  template:\n    metadata:\n      labels:\n        app: my-app\n    spec:\n      securityContext:\n        runAsNonRoot: true\n        seccompProfile:\n          type: RuntimeDefault\n      containers:\n        - name: my-app\n          image: registry.example.com/my-app:1.4.0\n          ports:\n            - containerPort: 8080\n          securityContext:\n            runAsNonRoot: true\n            allowPrivilegeEscalation: false\n            seccompProfile:\n              type: RuntimeDefault\n            capabilities:\n              drop:\n                - ALL"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "openshift-docker-best-practices",
+      "rule": "secrets-configmap",
+      "title": "Separate application configuration from container images using ConfigMaps",
+      "impact": "MEDIUM",
+      "tags": [
+        "kubernetes",
+        "openshift",
+        "configmap",
+        "configuration",
+        "twelve-factor"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "dockerfile",
+            "code": "# ❌ Config baked into the image — requires rebuild per environment\nFROM node:22-alpine\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci --omit=dev\nCOPY . .\n\n# Environment-specific config is part of the image\nCOPY config/production.yaml /app/config.yaml\n\n# Changing database host requires a full image rebuild and push\nCMD [\"node\", \"server.js\"]"
+          },
+          "correct": {
+            "lang": "yaml",
+            "code": "# ✅ ConfigMap with environment-specific configuration\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: app-config\n  namespace: production\ndata:\n  config.yaml: |\n    server:\n      port: 8080\n    database:\n      host: prod-db.internal.example.com\n      pool-size: 20\n    logging:\n      level: INFO\n\n---\n# ✅ Mount ConfigMap as a file — same image works in all environments\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: api-server\nspec:\n  template:\n    spec:\n      containers:\n        - name: api-server\n          image: registry.example.com/api:2.0.0   # Same image for all envs\n          volumeMounts:\n            - name: config\n              mountPath: /app/config\n              readOnly: true\n      volumes:\n        - name: config\n          configMap:\n            name: app-config    # Different ConfigMap per namespace/environment"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "openshift-docker-best-practices",
+      "rule": "secrets-no-hardcode",
+      "title": "Never hardcode secrets in Dockerfiles or deployment manifests",
+      "impact": "CRITICAL",
+      "tags": [
+        "security",
+        "secrets",
+        "docker",
+        "kubernetes",
+        "vault",
+        "hardcoded-credentials"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "dockerfile",
+            "code": "# ❌ Secrets baked into image layers — visible via `docker history`\nFROM node:22-alpine\nWORKDIR /app\n\nENV DB_HOST=prod-db.internal.example.com\nENV DB_PASSWORD=super_secret_password_123\nENV API_KEY=sk-live-abc123xyz789\n\nCOPY . .\nRUN npm ci --omit=dev\nCMD [\"node\", \"server.js\"]"
+          },
+          "correct": {
+            "lang": "yaml",
+            "code": "# ✅ Step 1: Create a Secret (or use External Secrets Operator / Sealed Secrets)\napiVersion: v1\nkind: Secret\nmetadata:\n  name: app-credentials\ntype: Opaque\nstringData:\n  db-password: \"super_secret_password_123\"    # base64-encoded at rest\n  api-key: \"sk-live-abc123xyz789\"\n\n---\n# ✅ Step 2: Reference secrets in Deployment — never inline values\napiVersion: apps/v1\nkind: Deployment\nspec:\n  template:\n    spec:\n      containers:\n        - name: app\n          env:\n            - name: DB_PASSWORD\n              valueFrom:\n                secretKeyRef:\n                  name: app-credentials\n                  key: db-password\n            - name: API_KEY\n              valueFrom:\n                secretKeyRef:\n                  name: app-credentials\n                  key: api-key\n          # Alternative: mount all secrets as files\n          # volumeMounts:\n          #   - name: secrets\n          #     mountPath: /etc/secrets\n          #     readOnly: true"
           }
         }
       ]

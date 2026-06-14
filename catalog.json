@@ -1,15 +1,15 @@
 {
-  "generated": "2026-06-14T07:05:22.942Z",
+  "generated": "2026-06-14T09:12:18.726Z",
   "totalSkills": 7,
-  "totalRules": 133,
+  "totalRules": 190,
   "skills": [
     {
       "name": "frontend-frameworks-best-practices",
       "directory": "frontend-frameworks-best-practices",
-      "description": "Best practices for modern component-based frontend development using React or Vue, combined with TailwindCSS for utility-first styling. Covers component architecture, state management, and CSS organization.",
+      "description": "Best practices for modern component-based frontend development using React or Vue, combined with TailwindCSS for utility-first styling. Covers component architecture, state management, CSS organization, accessibility, error handling, TypeScript type safety, forms & validation, performance optimization, and testing.",
       "license": "MIT",
       "author": "Frontend Engineering",
-      "version": "1.0.0",
+      "version": "2.0.0",
       "tags": [
         "frontend",
         "react",
@@ -17,9 +17,16 @@
         "tailwindcss",
         "components",
         "state",
-        "css"
+        "css",
+        "accessibility",
+        "a11y",
+        "typescript",
+        "error-handling",
+        "forms",
+        "testing",
+        "performance"
       ],
-      "ruleCount": 4,
+      "ruleCount": 20,
       "skillFile": "./frontend-frameworks-best-practices/SKILL.md",
       "agentsFile": "./frontend-frameworks-best-practices/AGENTS.md"
     },
@@ -67,29 +74,35 @@
     {
       "name": "kotlin-webflux-best-practices",
       "directory": "kotlin-webflux-best-practices",
-      "description": "Best practices for building highly scalable, non-blocking APIs using Kotlin and Spring WebFlux. Covers coroutines, functional routing, blocking I/O isolation, and reactive testing.",
+      "description": "Best practices for building highly scalable, non-blocking APIs using Kotlin and Spring WebFlux. Covers reactive core threading, coroutines, WebClient configuration, R2DBC data access, reactive security, error handling, resilience patterns, observability, and testing.",
       "license": "MIT",
       "author": "Backend Engineering",
-      "version": "1.0.0",
+      "version": "2.0.0",
       "tags": [
         "kotlin",
         "spring-boot",
         "webflux",
         "reactive",
         "coroutines",
-        "non-blocking"
+        "non-blocking",
+        "webclient",
+        "r2dbc",
+        "security",
+        "resilience",
+        "observability",
+        "testing"
       ],
-      "ruleCount": 6,
+      "ruleCount": 20,
       "skillFile": "./kotlin-webflux-best-practices/SKILL.md",
       "agentsFile": "./kotlin-webflux-best-practices/AGENTS.md"
     },
     {
       "name": "openshift-docker-best-practices",
       "directory": "openshift-docker-best-practices",
-      "description": "Best practices for containerization and deployment to Red Hat OpenShift. Focuses on Dockerfile optimization, SCC (Security Context Constraints) compliance, non-root users, and Kubernetes resources.",
+      "description": "Best practices for containerization and deployment to Red Hat OpenShift and Kubernetes. Covers Dockerfile optimization, SCC compliance, security context hardening, secrets management, networking policies, deployment strategies, resource management, and CI/CD supply chain security.",
       "license": "MIT",
       "author": "Platform Engineering",
-      "version": "1.0.0",
+      "version": "2.0.0",
       "tags": [
         "docker",
         "openshift",
@@ -97,9 +110,14 @@
         "containers",
         "security",
         "scc",
-        "devops"
+        "devops",
+        "networking",
+        "deployment",
+        "secrets",
+        "cicd",
+        "supply-chain"
       ],
-      "ruleCount": 4,
+      "ruleCount": 20,
       "skillFile": "./openshift-docker-best-practices/SKILL.md",
       "agentsFile": "./openshift-docker-best-practices/AGENTS.md"
     },
@@ -118,13 +136,16 @@
     {
       "name": "security-review-best-practices",
       "directory": "security-review-best-practices",
-      "description": "Security review guidelines for web applications and APIs. Use this skill when writing, reviewing, or auditing code for security vulnerabilities — covering authentication, input validation, secrets management, API security, data protection, SCA/CVE scanning (JFrog Xray, OWASP Dependency Check, Trivy), SAST (SonarQube, Semgrep, CodeQL), and infrastructure hardening.",
+      "description": "Static Application Security Testing (SAST) guidelines for web applications and APIs, aligned to OWASP Top 10:2025. Use this skill when writing, reviewing, or auditing source code for security vulnerabilities — covering authentication, input validation, injection prevention, secrets management, API security, data protection, dependency analysis, error handling, infrastructure hardening, SCA/CVE scanning, SAST tooling, and secure design.",
       "license": "MIT",
       "author": "Security Engineering",
-      "version": "1.0.0",
+      "version": "2.0.0",
       "tags": [
         "security",
         "owasp",
+        "owasp-top-10",
+        "owasp-2025",
+        "sast",
         "authentication",
         "authorization",
         "injection",
@@ -137,10 +158,10 @@
         "codeql",
         "trivy",
         "sca",
-        "sast",
-        "cve"
+        "cve",
+        "threat-modeling"
       ],
-      "ruleCount": 39,
+      "ruleCount": 50,
       "skillFile": "./security-review-best-practices/SKILL.md",
       "agentsFile": "./security-review-best-practices/AGENTS.md"
     }

@@ -1,5 +1,5 @@
 {
-  "version": "1.0.0",
+  "version": "2.0.0",
   "author": "Platform Engineering",
-  "tags": ["docker", "openshift", "kubernetes", "containers", "security", "scc"]
+  "tags": ["docker", "openshift", "kubernetes", "containers", "security", "scc", "devops", "networking", "deployment", "secrets", "cicd", "supply-chain"]
 }

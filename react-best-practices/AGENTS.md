@@ -23,7 +23,8 @@ Comprehensive performance optimization guide for React and Next.js applications,
 
 ## 1. Advanced Patterns {#section-1}
 
-**Impact:** UNKNOWN
+**Impact:** LOW
+**Description:** Advanced patterns for specific cases that require careful implementation.
 
 ## Do Not Put Effect Events in Dependency Arrays
 
@@ -203,7 +204,8 @@ function SearchInput({ onSearch }: { onSearch: (q: string) => void }) {
 
 ## 2. Eliminating Waterfalls {#section-2}
 
-**Impact:** UNKNOWN
+**Impact:** CRITICAL
+**Description:** Waterfalls are the #1 performance killer. Each sequential await adds full network latency. Eliminating them yields the largest gains.
 
 ## Prevent Waterfall Chains in API Routes
 
@@ -518,7 +520,8 @@ Both components share the same promise, so only one fetch occurs. Layout renders
 
 ## 3. Bundle Size Optimization {#section-3}
 
-**Impact:** UNKNOWN
+**Impact:** CRITICAL
+**Description:** Reducing initial bundle size improves Time to Interactive and Largest Contentful Paint.
 
 ## Prefer Statically Analyzable Paths
 
@@ -786,7 +789,8 @@ The `typeof window !== 'undefined'` check prevents bundling preloaded modules fo
 
 ## 4. Client-Side Data Fetching {#section-4}
 
-**Impact:** UNKNOWN
+**Impact:** MEDIUM-HIGH
+**Description:** Automatic deduplication and efficient data fetching patterns reduce redundant network requests.
 
 ## Deduplicate Global Event Listeners
 
@@ -1023,7 +1027,8 @@ Reference: [https://swr.vercel.app](https://swr.vercel.app)
 
 ## 5. JavaScript Performance {#section-5}
 
-**Impact:** UNKNOWN
+**Impact:** LOW-MEDIUM
+**Description:** Micro-optimizations for hot paths can add up to meaningful improvements.
 
 ## Avoid Layout Thrashing
 
@@ -1797,7 +1802,8 @@ const sorted = [...items].sort((a, b) => a.value - b.value)
 
 ## 6. Rendering Performance {#section-6}
 
-**Impact:** UNKNOWN
+**Impact:** MEDIUM
+**Description:** Optimizing the rendering process reduces the work the browser needs to do.
 
 ## Use Activity Component for Show/Hide
 
@@ -2322,7 +2328,8 @@ Reference: [useTransition](https://react.dev/reference/react/useTransition)
 
 ## 7. Re-render Optimization {#section-7}
 
-**Impact:** UNKNOWN
+**Impact:** MEDIUM
+**Description:** Reducing unnecessary re-renders minimizes wasted computation and improves UI responsiveness.
 
 ## Defer State Reads to Usage Point
 
@@ -3029,7 +3036,8 @@ function Tracker() {
 
 ## 8. Server-Side Performance {#section-8}
 
-**Impact:** UNKNOWN
+**Impact:** HIGH
+**Description:** Optimizing server-side rendering and data fetching eliminates server-side waterfalls and reduces response times.
 
 ## Use after() for Non-Blocking Operations
 

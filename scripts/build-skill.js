@@ -79,7 +79,7 @@ function parseSections(sectionsPath) {
   const map = {};
 
   // Match blocks like: ## N. Title (prefix)
-  const blockRe = /^##\s+\d+\.\s+(.+?)\s+\((\w+)\)\s*$([\s\S]*?)(?=^##\s+\d+\.|$)/gm;
+  const blockRe = /^##\s+\d+\.\s+(.+?)\s+\((\w+)\)\s*$([\s\S]*?)(?=^##\s+\d+\.|(?![\s\S]))/gm;
   let m;
   while ((m = blockRe.exec(content)) !== null) {
     const title       = m[1].trim();

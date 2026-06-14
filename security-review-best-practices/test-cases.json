@@ -1,7 +1,7 @@
 {
-  "generated": "2026-06-14T07:05:17.982Z",
+  "generated": "2026-06-14T09:12:11.846Z",
   "skill": "security-review-best-practices",
-  "total": 39,
+  "total": 50,
   "testCases": [
     {
       "skill": "security-review-best-practices",
@@ -31,6 +31,32 @@
     },
     {
       "skill": "security-review-best-practices",
+      "rule": "api-file-upload",
+      "title": "Secure File Upload Handling",
+      "impact": "HIGH",
+      "tags": [
+        "security",
+        "file-upload",
+        "validation",
+        "mime-type",
+        "injection",
+        "path-traversal"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "typescript",
+            "code": "// ❌ Trusting filename, MIME type, and size from the client\nimport multer from 'multer'\n\nconst upload = multer({\n  dest: 'public/uploads/',  // Stored in publicly accessible directory!\n  // No file size limit\n  // No file type validation\n})\n\napp.post('/api/upload', upload.single('file'), async (req, res) => {\n  const file = req.file!\n  // ❌ Using original filename — path traversal: \"../../../etc/cron.d/backdoor\"\n  const finalPath = `public/uploads/${file.originalname}`\n  await fs.rename(file.path, finalPath)\n\n  // File is now served at https://app.com/uploads/malicious.html\n  // If it contains <script>alert(document.cookie)</script> → stored XSS\n  res.json({ url: `/uploads/${file.originalname}` })\n})"
+          },
+          "correct": {
+            "lang": "typescript",
+            "code": "import multer from 'multer'\nimport { fileTypeFromBuffer } from 'file-type'\nimport crypto from 'crypto'\nimport path from 'path'\n\n// ✅ Strict file size limit\nconst upload = multer({\n  dest: '/tmp/uploads/',                  // Temporary staging — NOT public\n  limits: { fileSize: 5 * 1024 * 1024 },  // 5MB max\n})\n\nconst ALLOWED_TYPES = new Map([\n  ['image/jpeg', '.jpg'],\n  ['image/png', '.png'],\n  ['image/webp', '.webp'],\n  ['application/pdf', '.pdf'],\n])\n\napp.post('/api/upload', upload.single('file'), async (req, res) => {\n  const file = req.file!\n\n  // ✅ Step 1: Validate MIME type by reading magic bytes (not trusting headers)\n  const buffer = await fs.readFile(file.path)\n  const detected = await fileTypeFromBuffer(buffer)\n\n  if (!detected || !ALLOWED_TYPES.has(detected.mime)) {\n    await fs.unlink(file.path)  // Clean up rejected file\n    return res.status(400).json({ error: 'File type not allowed' })\n  }\n\n  // ✅ Step 2: Generate a safe random filename (ignore client filename entirely)\n  const safeFilename = `${crypto.randomUUID()}${ALLOWED_TYPES.get(detected.mime)}`\n\n  // ✅ Step 3: Store outside the webroot — serve via a controller, not static files\n  const storagePath = path.join('/var/app/storage/uploads', safeFilename)\n  await fs.rename(file.path, storagePath)\n\n  // ✅ Step 4: Store metadata in database, serve through an authenticated endpoint\n  const record = await db.uploads.create({\n    id: crypto.randomUUID(),\n    filename: safeFilename,\n    originalName: file.originalname,\n    mimeType: detected.mime,\n    size: file.size,\n    uploadedBy: req.user.id,\n  })\n\n  res.json({ id: record.id, url: `/api/files/${record.id}` })\n})"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "security-review-best-practices",
       "rule": "api-https-only",
       "title": "Enforce HTTPS and Set HTTP Strict Transport Security (HSTS)",
       "impact": "HIGH",
@@ -52,6 +78,32 @@
           "correct": {
             "lang": "typescript",
             "code": "import helmet from 'helmet'\nimport express from 'express'\n\nconst app = express()\n\n// ✅ Force HTTPS redirect — HTTP → HTTPS\napp.use((req, res, next) => {\n  if (\n    process.env.NODE_ENV === 'production' &&\n    req.headers['x-forwarded-proto'] !== 'https'\n  ) {\n    return res.redirect(301, `https://${req.headers.host}${req.url}`)\n  }\n  next()\n})\n\n// ✅ HSTS — strict transport security with long max-age and subdomains\napp.use(helmet.hsts({\n  maxAge:            365 * 24 * 60 * 60,  // 1 year (recommended: 2 years)\n  includeSubDomains: true,\n  preload:           true,                // submit to HSTS preload list\n}))\n\n// ✅ Full helmet setup (includes HSTS + other security headers)\napp.use(helmet())\n\n// ✅ NGINX config — redirect HTTP and set HSTS\n// server {\n//   listen 80;\n//   return 301 https://$host$request_uri;\n// }\n// server {\n//   listen 443 ssl;\n//   add_header Strict-Transport-Security \"max-age=63072000; includeSubDomains; preload\";\n//   ssl_protocols TLSv1.2 TLSv1.3;\n//   ssl_prefer_server_ciphers off;\n// }"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "security-review-best-practices",
+      "rule": "api-idempotency",
+      "title": "Use Idempotency Keys for Mutating Endpoints",
+      "impact": "HIGH",
+      "tags": [
+        "security",
+        "api",
+        "idempotency",
+        "design",
+        "duplicate-processing",
+        "race-condition"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "typescript",
+            "code": "// ❌ No idempotency — retried requests charge the customer twice\napp.post('/api/payments', async (req, res) => {\n  const { amount, currency, customerId } = req.body\n\n  // If the network drops after charging but before the response reaches the client,\n  // the client retries → customer is charged twice\n  const charge = await stripe.charges.create({\n    amount,\n    currency,\n    customer: customerId,\n  })\n\n  await db.payments.insert({\n    chargeId: charge.id,\n    amount,\n    customerId,\n  })\n\n  res.json({ success: true, chargeId: charge.id })\n})"
+          },
+          "correct": {
+            "lang": "typescript",
+            "code": "// ✅ Idempotency key prevents duplicate processing\napp.post('/api/payments', async (req, res) => {\n  const idempotencyKey = req.headers['idempotency-key'] as string\n\n  if (!idempotencyKey) {\n    return res.status(400).json({ error: 'Idempotency-Key header is required' })\n  }\n\n  // Check if this key was already processed\n  const existing = await db.idempotencyKeys.findOne({\n    key: idempotencyKey,\n    endpoint: '/api/payments',\n  })\n\n  if (existing) {\n    // Return the cached response — no side effects executed\n    return res.status(existing.statusCode).json(existing.responseBody)\n  }\n\n  // Process the request (first time with this key)\n  const { amount, currency, customerId } = req.body\n  const charge = await stripe.charges.create({\n    amount,\n    currency,\n    customer: customerId,\n    idempotencyKey,  // Stripe also supports idempotency natively\n  })\n\n  const response = { success: true, chargeId: charge.id }\n\n  // Cache the response for this idempotency key (TTL: 24 hours)\n  await db.idempotencyKeys.insert({\n    key: idempotencyKey,\n    endpoint: '/api/payments',\n    statusCode: 200,\n    responseBody: response,\n    expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),\n  })\n\n  res.json(response)\n})"
           }
         }
       ]
@@ -267,6 +319,31 @@
     },
     {
       "skill": "security-review-best-practices",
+      "rule": "auth-ssrf-prevention",
+      "title": "Prevent Server-Side Request Forgery with URL Allowlists",
+      "impact": "CRITICAL",
+      "tags": [
+        "security",
+        "ssrf",
+        "server-side-request-forgery",
+        "url-validation",
+        "access-control"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "typescript",
+            "code": "// ❌ Fetches any URL the user provides — including internal services\napp.post('/api/preview', async (req, res) => {\n  const { url } = req.body\n\n  // Attacker sends: url = \"http://169.254.169.254/latest/meta-data/iam/security-credentials/\"\n  // → Server fetches AWS IAM credentials and returns them to the attacker\n\n  // Attacker sends: url = \"http://10.0.0.5:6379/CONFIG+SET+dir+/var/www/html\"\n  // → Server sends commands to internal Redis\n\n  const response = await fetch(url)\n  const html = await response.text()\n  res.json({ preview: html })\n})\n\n// ❌ DNS rebinding bypasses hostname checks\n// Attacker's DNS returns 1.2.3.4 on first lookup (passes validation)\n// then 169.254.169.254 on second lookup (actual fetch hits metadata API)"
+          },
+          "correct": {
+            "lang": "typescript",
+            "code": "import { URL } from 'url'\nimport dns from 'dns/promises'\nimport ipaddr from 'ipaddr.js'\n\n// ✅ Allowlist of permitted domains\nconst ALLOWED_HOSTS = new Set(['api.example.com', 'cdn.example.com', 'images.example.com'])\n\n// ✅ Block private/internal IP ranges\nfunction isPrivateIP(ip: string): boolean {\n  try {\n    const addr = ipaddr.parse(ip)\n    const range = addr.range()\n    return ['private', 'loopback', 'linkLocal', 'uniqueLocal', 'unspecified'].includes(range)\n  } catch {\n    return true  // Block unparseable addresses\n  }\n}\n\napp.post('/api/preview', async (req, res) => {\n  const { url: userUrl } = req.body\n\n  // Step 1: Parse and validate URL scheme\n  const parsed = new URL(userUrl)\n  if (!['https:'].includes(parsed.protocol)) {\n    return res.status(400).json({ error: 'Only HTTPS URLs are allowed' })\n  }\n\n  // Step 2: Check hostname against allowlist\n  if (!ALLOWED_HOSTS.has(parsed.hostname)) {\n    return res.status(400).json({ error: 'Domain not in allowlist' })\n  }\n\n  // Step 3: Resolve DNS and check for private IPs (prevents DNS rebinding)\n  const addresses = await dns.resolve4(parsed.hostname)\n  if (addresses.some(isPrivateIP)) {\n    return res.status(400).json({ error: 'Blocked: target resolves to private IP' })\n  }\n\n  // Step 4: Fetch with redirect disabled (prevents redirect to internal URLs)\n  const response = await fetch(userUrl, { redirect: 'error' })\n  const html = await response.text()\n  res.json({ preview: html.substring(0, 10000) })  // Limit response size\n})"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "security-review-best-practices",
       "rule": "auth-token-expiry",
       "title": "Use Short-Lived Access Tokens with Rotating Refresh Tokens",
       "impact": "CRITICAL",
@@ -373,6 +450,33 @@
     },
     {
       "skill": "security-review-best-practices",
+      "rule": "data-tls-in-transit",
+      "title": "Use TLS 1.2+ for All Data in Transit",
+      "impact": "HIGH",
+      "tags": [
+        "security",
+        "tls",
+        "encryption",
+        "transport",
+        "https",
+        "ssl",
+        "certificate"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "typescript",
+            "code": "// ❌ HTTP connection to database — credentials sent in plain text\nimport { Pool } from 'pg'\nconst pool = new Pool({\n  host: 'db.internal.example.com',\n  user: 'app_user',\n  password: process.env.DB_PASSWORD,\n  ssl: false,  // Plain text connection — password visible on network\n})\n\n// ❌ Internal microservice call without TLS\nconst response = await fetch('http://user-service.internal:3000/api/users/123')\n// Authentication headers sent in plain text over the network\n\n// ❌ Node.js HTTPS server allowing TLS 1.0\nimport https from 'https'\nconst server = https.createServer({\n  key: fs.readFileSync('server.key'),\n  cert: fs.readFileSync('server.crt'),\n  // No minVersion set — defaults allow TLS 1.0 and 1.1\n})"
+          },
+          "correct": {
+            "lang": "typescript",
+            "code": "// ✅ Database connection with TLS required\nimport { Pool } from 'pg'\nconst pool = new Pool({\n  host: 'db.internal.example.com',\n  user: 'app_user',\n  password: process.env.DB_PASSWORD,\n  ssl: {\n    rejectUnauthorized: true,              // Verify server certificate\n    ca: fs.readFileSync('/etc/ssl/db-ca.pem'),  // Pin the CA\n    minVersion: 'TLSv1.2',                // Reject TLS 1.0/1.1\n  },\n})\n\n// ✅ Internal service calls over HTTPS\nconst response = await fetch('https://user-service.internal:3000/api/users/123', {\n  headers: { Authorization: `Bearer ${token}` },\n})\n\n// ✅ HTTPS server with TLS 1.2+ minimum\nimport https from 'https'\nconst server = https.createServer({\n  key: fs.readFileSync('server.key'),\n  cert: fs.readFileSync('server.crt'),\n  minVersion: 'TLSv1.2',     // Reject TLS 1.0 and 1.1\n  ciphers: [                   // Strong cipher suites only\n    'TLS_AES_256_GCM_SHA384',\n    'TLS_CHACHA20_POLY1305_SHA256',\n    'ECDHE-RSA-AES256-GCM-SHA384',\n  ].join(':'),\n})"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "security-review-best-practices",
       "rule": "deps-audit",
       "title": "Audit Dependencies and Run Security Checks in CI",
       "impact": "MEDIUM-HIGH",
@@ -451,6 +555,85 @@
     },
     {
       "skill": "security-review-best-practices",
+      "rule": "design-threat-modeling",
+      "title": "Require Threat Models for New Features and Services",
+      "impact": "HIGH",
+      "tags": [
+        "security",
+        "design",
+        "threat-modeling",
+        "stride",
+        "architecture",
+        "abuse-cases"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "typescript",
+            "code": "// ❌ Feature designed and built without threat analysis\n// User story: \"As a user, I can share files with other users via a public link\"\n//\n// What the team missed:\n//   - No expiry on share links → permanent access even after revocation intent\n//   - Sequential share IDs → attacker can enumerate all shared files\n//   - No access logging → breach goes undetected\n//   - No rate limiting on link creation → mass exfiltration tool\n//   - Shared files include metadata with internal user IDs\n\napp.post('/api/shares', async (req, res) => {\n  const share = await db.shares.create({\n    fileId: req.body.fileId,\n    shareId: nextSequentialId++,        // Enumerable!\n    // No expiry, no access controls, no audit trail\n  })\n  res.json({ url: `https://app.com/share/${share.shareId}` })\n})"
+          },
+          "correct": {
+            "lang": "markdown",
+            "code": "# Threat Model: File Sharing Feature\n\n## Data Flow\nUser → API Gateway → Share Service → Object Storage\n                  ↘ Notification Service → Email\n\n## Trust Boundaries\n1. Public Internet ↔ API Gateway (authentication required)\n2. API Gateway ↔ Internal Services (mTLS, service mesh)\n3. Share Link ↔ Object Storage (pre-signed URL, time-limited)\n\n## STRIDE Analysis\n\n| Threat | Category | Mitigation |\n|--------|----------|------------|\n| Attacker guesses share IDs | Spoofing | Use UUID v4 (128-bit random), not sequential IDs |\n| Revoked link still works | Tampering | Expire links after 7 days, support manual revocation |\n| No record of who accessed | Repudiation | Log every access with IP, user-agent, timestamp |\n| Shared file leaks metadata | Information Disclosure | Strip internal metadata before serving |\n| Mass link creation for exfiltration | Denial of Service | Rate limit: 10 shares/user/hour |\n| Link bypasses file permissions | Elevation of Privilege | Verify sharer still has access on every link use |\n\n## Abuse Cases\n- Attacker creates thousands of share links to exfiltrate entire drive\n- Former employee's share links remain active after account deletion\n- Search engines index share links, making files publicly discoverable"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "security-review-best-practices",
+      "rule": "error-graceful-degradation",
+      "title": "Implement Circuit Breakers and Graceful Degradation",
+      "impact": "MEDIUM",
+      "tags": [
+        "security",
+        "error-handling",
+        "circuit-breaker",
+        "resilience",
+        "graceful-degradation",
+        "availability"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "typescript",
+            "code": "// ❌ Unbounded retries — amplifies downstream failures\nasync function getRecommendations(userId: string): Promise<Product[]> {\n  // If recommendation-service is down, this retries forever\n  // Each request waits 30s (default timeout), blocking a thread\n  // 100 concurrent users = 100 blocked connections = app is frozen\n  while (true) {\n    try {\n      const res = await fetch(`http://recommendation-service/api/recommend/${userId}`)\n      return await res.json()\n    } catch {\n      // Retry immediately — hammers the failing service\n      await new Promise(r => setTimeout(r, 100))\n    }\n  }\n}\n\n// API handler blocks entirely when recommendations are unavailable\napp.get('/api/products', async (req, res) => {\n  const products = await getProducts()\n  const recommendations = await getRecommendations(req.user.id)  // Blocks forever\n  res.json({ products, recommendations })\n})"
+          },
+          "correct": {
+            "lang": "typescript",
+            "code": "import CircuitBreaker from 'opossum'\n\n// ✅ Circuit breaker wraps the unreliable call\nconst recommendationBreaker = new CircuitBreaker(\n  async (userId: string): Promise<Product[]> => {\n    const res = await fetch(`http://recommendation-service/api/recommend/${userId}`, {\n      signal: AbortSignal.timeout(3000),  // 3s timeout per request\n    })\n    if (!res.ok) throw new Error(`Service returned ${res.status}`)\n    return res.json()\n  },\n  {\n    timeout: 5000,           // Max 5s before considering a failure\n    errorThresholdPercentage: 50,  // Open circuit after 50% failures\n    resetTimeout: 30000,     // Try again after 30s\n    volumeThreshold: 5,      // Minimum 5 requests before calculating error rate\n  }\n)\n\n// ✅ Fallback returns cached/default data when circuit is open\nrecommendationBreaker.fallback(async (userId: string) => {\n  // Return cached recommendations or popular items\n  const cached = await cache.get(`recommendations:${userId}`)\n  return cached ?? await getPopularProducts()\n})\n\n// ✅ API handler degrades gracefully — always responds\napp.get('/api/products', async (req, res) => {\n  const products = await getProducts()\n  const recommendations = await recommendationBreaker.fire(req.user.id)\n  res.json({ products, recommendations })  // Always returns, even if recommendations are fallback data\n})"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "security-review-best-practices",
+      "rule": "error-no-sensitive-logs",
+      "title": "Never Log Passwords, Tokens, or PII",
+      "impact": "MEDIUM",
+      "tags": [
+        "security",
+        "logging",
+        "pii",
+        "secrets",
+        "redaction",
+        "privacy",
+        "gdpr"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "typescript",
+            "code": "// ❌ Logging the entire request body — includes passwords and tokens\napp.post('/api/login', async (req, res) => {\n  logger.info('Login attempt', { body: req.body })\n  // Logs: { body: { email: \"user@example.com\", password: \"MyS3cret!\" } }\n\n  const user = await authenticate(req.body.email, req.body.password)\n  logger.info('Login successful', { user })\n  // Logs: { user: { id: 1, email: \"user@example.com\", ssn: \"123-45-6789\" } }\n})\n\n// ❌ Logging authorization headers — exposes JWT/API keys\napp.use((req, res, next) => {\n  logger.debug('Incoming request', {\n    url: req.url,\n    headers: req.headers,  // Includes Authorization: Bearer eyJhbGci...\n  })\n  next()\n})"
+          },
+          "correct": {
+            "lang": "typescript",
+            "code": "import pino from 'pino'\n\n// ✅ Configure logger with automatic redaction of sensitive fields\nconst logger = pino({\n  redact: {\n    paths: [\n      'req.headers.authorization',\n      'req.headers.cookie',\n      'body.password',\n      'body.confirmPassword',\n      'body.token',\n      'body.creditCard',\n      'body.ssn',\n      'user.ssn',\n      'user.password',\n      '*.secret',\n      '*.apiKey',\n    ],\n    censor: '[REDACTED]',\n  },\n})\n\n// ✅ Log only safe, non-sensitive identifiers\napp.post('/api/login', async (req, res) => {\n  logger.info({ email: req.body.email }, 'Login attempt')\n  // Logs: { email: \"user@example.com\", msg: \"Login attempt\" }\n\n  const user = await authenticate(req.body.email, req.body.password)\n  logger.info({ userId: user.id, role: user.role }, 'Login successful')\n  // Logs: { userId: 1, role: \"user\", msg: \"Login successful\" }\n})\n\n// ✅ Mask PII helper for when logging is necessary\nfunction maskEmail(email: string): string {\n  const [local, domain] = email.split('@')\n  return `${local[0]}***@${domain}`  // \"u***@example.com\"\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "security-review-best-practices",
       "rule": "error-no-stack-traces",
       "title": "Never Expose Stack Traces or Internal Errors to Clients",
       "impact": "MEDIUM",
@@ -470,6 +653,32 @@
           "correct": {
             "lang": "typescript",
             "code": "import { randomUUID } from 'crypto'\n\n// ✅ Centralized error handler — generic client response, full server log\napp.use((err: unknown, req: Request, res: Response, _next: NextFunction) => {\n  const errorId = randomUUID()\n\n  // Log full details server-side with correlation ID\n  logger.error({\n    errorId,\n    message: err instanceof Error ? err.message : String(err),\n    stack:   err instanceof Error ? err.stack : undefined,\n    url:     req.url,\n    method:  req.method,\n    userId:  req.user?.id,\n  })\n\n  // Determine HTTP status from error type\n  if (err instanceof ValidationError) {\n    return res.status(400).json({ error: 'Invalid request', errorId })\n  }\n  if (err instanceof AuthError) {\n    return res.status(401).json({ error: 'Unauthorized', errorId })\n  }\n  if (err instanceof ForbiddenError) {\n    return res.status(403).json({ error: 'Forbidden', errorId })\n  }\n  if (err instanceof NotFoundError) {\n    return res.status(404).json({ error: 'Not found', errorId })\n  }\n\n  // ✅ Generic 500 — no internal details\n  res.status(500).json({\n    error:   'An unexpected error occurred',\n    errorId, // user can report this ID; engineer can find full details in logs\n  })\n})\n\n// ✅ Also handle unhandled rejections\nprocess.on('unhandledRejection', (reason) => {\n  logger.error({ message: 'Unhandled promise rejection', reason })\n})"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "security-review-best-practices",
+      "rule": "error-resource-cleanup",
+      "title": "Ensure Exception-Safe Resource Cleanup",
+      "impact": "MEDIUM",
+      "tags": [
+        "security",
+        "error-handling",
+        "resource-cleanup",
+        "connection-leak",
+        "file-handle",
+        "finally"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "typescript",
+            "code": "// ❌ Database connection leaked if query throws\nasync function getUserOrders(userId: string): Promise<Order[]> {\n  const connection = await pool.getConnection()\n  // If this query throws, the connection is never released\n  const orders = await connection.query('SELECT * FROM orders WHERE user_id = ?', [userId])\n  connection.release()  // Never reached on error!\n  return orders\n}\n\n// ❌ File handle leaked if processing throws\nasync function processUpload(filePath: string): Promise<void> {\n  const handle = await fs.open(filePath, 'r')\n  const content = await handle.readFile('utf-8')\n  const parsed = JSON.parse(content)  // Throws on malformed JSON\n  await processData(parsed)\n  await handle.close()  // Never reached on error!\n}\n\n// ❌ Temporary file not cleaned up\nasync function generateReport(data: ReportData): Promise<string> {\n  const tempPath = `/tmp/report-${Date.now()}.pdf`\n  await writePDF(tempPath, data)\n  const url = await uploadToS3(tempPath)  // If this throws, temp file remains on disk\n  await fs.unlink(tempPath)  // Never reached on error!\n  return url\n}"
+          },
+          "correct": {
+            "lang": "typescript",
+            "code": "// ✅ try/finally ensures connection is always released\nasync function getUserOrders(userId: string): Promise<Order[]> {\n  const connection = await pool.getConnection()\n  try {\n    const orders = await connection.query('SELECT * FROM orders WHERE user_id = ?', [userId])\n    return orders\n  } finally {\n    connection.release()  // Always runs, even on exception\n  }\n}\n\n// ✅ Using Symbol.asyncDispose (TC39 Explicit Resource Management)\nasync function processUpload(filePath: string): Promise<void> {\n  await using handle = await fs.open(filePath, 'r')\n  // handle is automatically closed when scope exits, even on exception\n  const content = await handle.readFile('utf-8')\n  const parsed = JSON.parse(content)\n  await processData(parsed)\n}\n\n// ✅ Cleanup in finally for temporary files\nasync function generateReport(data: ReportData): Promise<string> {\n  const tempPath = `/tmp/report-${Date.now()}.pdf`\n  try {\n    await writePDF(tempPath, data)\n    const url = await uploadToS3(tempPath)\n    return url\n  } finally {\n    // Clean up temp file regardless of success or failure\n    await fs.unlink(tempPath).catch(() => {})  // Ignore \"file not found\" errors\n  }\n}"
           }
         }
       ]
@@ -603,6 +812,58 @@
           "correct": {
             "lang": "typescript",
             "code": "import { spawn } from 'child_process'\nimport path from 'path'\n\n// ✅ spawn with array of arguments — never interpreted as shell commands\nfunction convertImage(filename: string): Promise<string> {\n  // Validate the filename first\n  if (!/^[a-zA-Z0-9_\\-]+\\.(jpg|png|gif|webp)$/.test(filename)) {\n    throw new Error('Invalid filename')\n  }\n\n  const inputPath  = path.resolve('/uploads', filename)\n  const outputPath = path.resolve('/processed', `${Date.now()}.jpg`)\n\n  return new Promise((resolve, reject) => {\n    const proc = spawn('convert', [inputPath, outputPath], {\n      shell: false,  // ✅ explicitly disable shell\n      timeout: 10000,\n    })\n    proc.on('close', code => {\n      if (code !== 0) reject(new Error(`convert exited with ${code}`))\n      else resolve(outputPath)\n    })\n  })\n}\n\n// ✅ For ping — allowlist hosts, use spawn\nfunction ping(host: string) {\n  const allowedHosts = ['8.8.8.8', '1.1.1.1', '8.8.4.4']\n  if (!allowedHosts.includes(host)) throw new Error('Host not allowed')\n\n  return spawn('ping', ['-c', '4', host], { shell: false })\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "security-review-best-practices",
+      "rule": "input-deserialization",
+      "title": "Avoid Unsafe Deserialization of Untrusted Data",
+      "impact": "CRITICAL",
+      "tags": [
+        "security",
+        "deserialization",
+        "injection",
+        "rce",
+        "input-validation",
+        "prototype-pollution"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "typescript",
+            "code": "// ❌ node-serialize executes functions embedded in serialized data\nimport { unserialize } from 'node-serialize'\n\napp.post('/api/session', (req, res) => {\n  // Attacker sends: {\"rce\":\"_$$ND_FUNC$$_function(){require('child_process').exec('rm -rf /')}()\"}\n  const session = unserialize(req.body.data)\n  res.json(session)\n})\n\n// ❌ eval-based deserialization\nfunction parseConfig(raw: string): Config {\n  return eval('(' + raw + ')')  // Executes arbitrary code!\n}\n\n// ❌ Unvalidated JSON.parse — prototype pollution\nconst userInput = JSON.parse(body)\n// If body = '{\"__proto__\":{\"isAdmin\":true}}', every object now has isAdmin=true\nObject.assign(defaults, userInput)"
+          },
+          "correct": {
+            "lang": "typescript",
+            "code": "import { z } from 'zod'\n\n// ✅ Parse JSON then immediately validate against a strict schema\nconst SessionSchema = z.object({\n  userId: z.string().uuid(),\n  role: z.enum(['user', 'admin']),\n  expiresAt: z.string().datetime(),\n})\n\napp.post('/api/session', (req, res) => {\n  const parsed = SessionSchema.safeParse(req.body)\n  if (!parsed.success) {\n    return res.status(400).json({ error: 'Invalid session data' })\n  }\n  // parsed.data is typed and validated — no extra properties\n  res.json(parsed.data)\n})\n\n// ✅ Prevent prototype pollution with Object.create(null) or explicit property checks\nfunction safeMerge(target: Record<string, unknown>, source: Record<string, unknown>) {\n  for (const key of Object.keys(source)) {\n    if (key === '__proto__' || key === 'constructor' || key === 'prototype') {\n      continue  // Block prototype pollution vectors\n    }\n    target[key] = source[key]\n  }\n  return target\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "security-review-best-practices",
+      "rule": "input-mass-assignment",
+      "title": "Prevent Mass Assignment by Using Explicit Field Allowlists",
+      "impact": "HIGH",
+      "tags": [
+        "security",
+        "mass-assignment",
+        "access-control",
+        "input-validation",
+        "orm",
+        "allowlist"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "typescript",
+            "code": "// ❌ Spreading the entire request body into the database update\napp.put('/api/users/:id', async (req, res) => {\n  // Attacker sends: { name: \"Legit\", role: \"admin\", isVerified: true }\n  // ORM writes ALL fields, including role and isVerified\n  const user = await db.users.update(req.params.id, req.body)\n  res.json(user)\n})\n\n// ❌ Sequelize: passing req.body directly to create\napp.post('/api/products', async (req, res) => {\n  // Attacker sends: { name: \"Widget\", price: 0, sellerId: \"other-user-id\" }\n  const product = await Product.create(req.body)  // Creates product with price=0\n  res.json(product)\n})\n\n// ❌ Mongoose: no field filtering\napp.patch('/api/settings', async (req, res) => {\n  // Attacker sends: { theme: \"dark\", creditBalance: 99999 }\n  await Settings.findByIdAndUpdate(req.user.settingsId, req.body)\n  res.json({ success: true })\n})"
+          },
+          "correct": {
+            "lang": "typescript",
+            "code": "import { z } from 'zod'\n\n// ✅ Define exactly which fields the user can update\nconst UpdateUserSchema = z.object({\n  name: z.string().min(1).max(100),\n  email: z.string().email(),\n  avatar: z.string().url().optional(),\n  // role, isVerified, isAdmin are NOT in the schema — silently stripped\n})\n\napp.put('/api/users/:id', async (req, res) => {\n  // Zod strips all fields not in the schema\n  const data = UpdateUserSchema.parse(req.body)\n  // data = { name: \"Legit\", email: \"user@example.com\" }\n  // role, isVerified, and any injected fields are gone\n  const user = await db.users.update(req.params.id, data)\n  res.json(user)\n})\n\n// ✅ Alternative: pick specific fields explicitly\napp.patch('/api/settings', async (req, res) => {\n  const allowedFields = ['theme', 'language', 'timezone', 'notifications'] as const\n  const safeUpdate: Record<string, unknown> = {}\n\n  for (const field of allowedFields) {\n    if (req.body[field] !== undefined) {\n      safeUpdate[field] = req.body[field]\n    }\n  }\n\n  await Settings.findByIdAndUpdate(req.user.settingsId, safeUpdate)\n  res.json({ success: true })\n})"
           }
         }
       ]
@@ -1012,6 +1273,32 @@
           "correct": {
             "lang": "typescript",
             "code": "// ✅ Load from environment — injected by secrets manager at runtime\nconst stripe = new Stripe(process.env.STRIPE_SECRET_KEY!)\n\n// ✅ Fail fast if required secrets are missing\nfunction requireEnv(key: string): string {\n  const value = process.env[key]\n  if (!value) throw new Error(`Missing required environment variable: ${key}`)\n  return value\n}\n\nconst JWT_SECRET   = requireEnv('JWT_SECRET')\nconst DATABASE_URL = requireEnv('DATABASE_URL')\nconst STRIPE_KEY   = requireEnv('STRIPE_SECRET_KEY')\n\n// ✅ Use a secrets manager (AWS Secrets Manager, HashiCorp Vault, Doppler)\nimport { SecretsManagerClient, GetSecretValueCommand } from '@aws-sdk/client-secrets-manager'\nconst client = new SecretsManagerClient({ region: 'us-east-1' })\n\nasync function getSecret(secretId: string): Promise<string> {\n  const response = await client.send(new GetSecretValueCommand({ SecretId: secretId }))\n  return response.SecretString!\n}\nconst stripeKey = await getSecret('prod/stripe/secret-key')"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "security-review-best-practices",
+      "rule": "secrets-rotation",
+      "title": "Implement and Test Automatic Secret Rotation",
+      "impact": "HIGH",
+      "tags": [
+        "security",
+        "secrets",
+        "rotation",
+        "credentials",
+        "key-management",
+        "zero-downtime"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "typescript",
+            "code": "// ❌ Hardcoded API key — never rotated, valid forever after leak\nconst STRIPE_KEY = process.env.STRIPE_SECRET_KEY\n// This key was set 18 months ago and never changed\n// If leaked via logs, git history, or memory dump, attacker has permanent access\n\n// ❌ Database password — manual rotation causes downtime\n// .env file:\n// DB_PASSWORD=production_password_2024\n// Changed manually once a year — requires app restart\n// No overlap period — old password stops working immediately"
+          },
+          "correct": {
+            "lang": "typescript",
+            "code": "// ✅ AWS Secrets Manager with automatic rotation\nimport { SecretsManagerClient, GetSecretValueCommand } from '@aws-sdk/client-secrets-manager'\n\nconst client = new SecretsManagerClient({ region: 'us-east-1' })\n\n// Fetch the current secret on every use — always gets the latest rotated value\nasync function getDbCredentials(): Promise<{ username: string; password: string }> {\n  const result = await client.send(\n    new GetSecretValueCommand({\n      SecretId: 'prod/database/credentials',\n      VersionStage: 'AWSCURRENT',  // Always the current, rotated version\n    })\n  )\n  return JSON.parse(result.SecretString!)\n}\n\n// ✅ Connection pool that refreshes credentials on authentication failure\nasync function createPool() {\n  const creds = await getDbCredentials()\n  const pool = new Pool({\n    user: creds.username,\n    password: creds.password,\n    host: process.env.DB_HOST,\n    // On auth failure, refresh credentials (rotation may have occurred)\n    connectionErrorHandler: async (err) => {\n      if (err.message.includes('authentication failed')) {\n        const newCreds = await getDbCredentials()\n        pool.options.password = newCreds.password\n      }\n    },\n  })\n  return pool\n}"
           }
         }
       ]
