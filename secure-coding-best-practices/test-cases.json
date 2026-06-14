@@ -1,10 +1,10 @@
 {
-  "generated": "2026-06-14T09:12:11.846Z",
-  "skill": "security-review-best-practices",
+  "generated": "2026-06-14T09:22:51.483Z",
+  "skill": "secure-coding-best-practices",
   "total": 50,
   "testCases": [
     {
-      "skill": "security-review-best-practices",
+      "skill": "secure-coding-best-practices",
       "rule": "api-cors",
       "title": "Configure CORS to Allow Only Trusted Origins",
       "impact": "HIGH",
@@ -30,7 +30,7 @@
       ]
     },
     {
-      "skill": "security-review-best-practices",
+      "skill": "secure-coding-best-practices",
       "rule": "api-file-upload",
       "title": "Secure File Upload Handling",
       "impact": "HIGH",
@@ -56,7 +56,7 @@
       ]
     },
     {
-      "skill": "security-review-best-practices",
+      "skill": "secure-coding-best-practices",
       "rule": "api-https-only",
       "title": "Enforce HTTPS and Set HTTP Strict Transport Security (HSTS)",
       "impact": "HIGH",
@@ -83,7 +83,7 @@
       ]
     },
     {
-      "skill": "security-review-best-practices",
+      "skill": "secure-coding-best-practices",
       "rule": "api-idempotency",
       "title": "Use Idempotency Keys for Mutating Endpoints",
       "impact": "HIGH",
@@ -109,7 +109,7 @@
       ]
     },
     {
-      "skill": "security-review-best-practices",
+      "skill": "secure-coding-best-practices",
       "rule": "api-rate-limiting",
       "title": "Apply Rate Limiting and Throttling on All Endpoints",
       "impact": "HIGH",
@@ -135,7 +135,7 @@
       ]
     },
     {
-      "skill": "security-review-best-practices",
+      "skill": "secure-coding-best-practices",
       "rule": "api-schema-validation",
       "title": "Validate Request Body and Query Parameters Against a Schema",
       "impact": "HIGH",
@@ -162,7 +162,7 @@
       ]
     },
     {
-      "skill": "security-review-best-practices",
+      "skill": "secure-coding-best-practices",
       "rule": "auth-jwt-validation",
       "title": "Fully Validate JWT Signature, Algorithm, and Claims",
       "impact": "CRITICAL",
@@ -188,7 +188,7 @@
       ]
     },
     {
-      "skill": "security-review-best-practices",
+      "skill": "secure-coding-best-practices",
       "rule": "auth-mfa",
       "title": "Enforce MFA for Privileged and Sensitive Operations",
       "impact": "HIGH",
@@ -214,7 +214,7 @@
       ]
     },
     {
-      "skill": "security-review-best-practices",
+      "skill": "secure-coding-best-practices",
       "rule": "auth-oauth-state",
       "title": "Use state and PKCE in OAuth/OIDC Flows",
       "impact": "CRITICAL",
@@ -241,7 +241,7 @@
       ]
     },
     {
-      "skill": "security-review-best-practices",
+      "skill": "secure-coding-best-practices",
       "rule": "auth-password-hashing",
       "title": "Use bcrypt or Argon2 for Password Hashing",
       "impact": "CRITICAL",
@@ -267,7 +267,7 @@
       ]
     },
     {
-      "skill": "security-review-best-practices",
+      "skill": "secure-coding-best-practices",
       "rule": "auth-rbac",
       "title": "Enforce Role-Based Access Control on Every Endpoint",
       "impact": "CRITICAL",
@@ -292,7 +292,7 @@
       ]
     },
     {
-      "skill": "security-review-best-practices",
+      "skill": "secure-coding-best-practices",
       "rule": "auth-session-management",
       "title": "Use Secure, HttpOnly, SameSite Session Cookies",
       "impact": "CRITICAL",
@@ -318,7 +318,7 @@
       ]
     },
     {
-      "skill": "security-review-best-practices",
+      "skill": "secure-coding-best-practices",
       "rule": "auth-ssrf-prevention",
       "title": "Prevent Server-Side Request Forgery with URL Allowlists",
       "impact": "CRITICAL",
@@ -343,7 +343,7 @@
       ]
     },
     {
-      "skill": "security-review-best-practices",
+      "skill": "secure-coding-best-practices",
       "rule": "auth-token-expiry",
       "title": "Use Short-Lived Access Tokens with Rotating Refresh Tokens",
       "impact": "CRITICAL",
@@ -369,7 +369,7 @@
       ]
     },
     {
-      "skill": "security-review-best-practices",
+      "skill": "secure-coding-best-practices",
       "rule": "data-encryption-at-rest",
       "title": "Encrypt Sensitive Data at Rest with AES-256",
       "impact": "HIGH",
@@ -396,7 +396,7 @@
       ]
     },
     {
-      "skill": "security-review-best-practices",
+      "skill": "secure-coding-best-practices",
       "rule": "data-minimal-collection",
       "title": "Collect Only the Data You Actually Need (Data Minimization)",
       "impact": "HIGH",
@@ -422,7 +422,7 @@
       ]
     },
     {
-      "skill": "security-review-best-practices",
+      "skill": "secure-coding-best-practices",
       "rule": "data-pii-masking",
       "title": "Mask or Redact PII in Logs and Error Messages",
       "impact": "HIGH",
@@ -449,7 +449,7 @@
       ]
     },
     {
-      "skill": "security-review-best-practices",
+      "skill": "secure-coding-best-practices",
       "rule": "data-tls-in-transit",
       "title": "Use TLS 1.2+ for All Data in Transit",
       "impact": "HIGH",
@@ -476,7 +476,7 @@
       ]
     },
     {
-      "skill": "security-review-best-practices",
+      "skill": "secure-coding-best-practices",
       "rule": "deps-audit",
       "title": "Audit Dependencies and Run Security Checks in CI",
       "impact": "MEDIUM-HIGH",
@@ -503,7 +503,7 @@
       ]
     },
     {
-      "skill": "security-review-best-practices",
+      "skill": "secure-coding-best-practices",
       "rule": "deps-lock-files",
       "title": "Always Commit and Verify Dependency Lock Files",
       "impact": "MEDIUM-HIGH",
@@ -529,7 +529,7 @@
       ]
     },
     {
-      "skill": "security-review-best-practices",
+      "skill": "secure-coding-best-practices",
       "rule": "deps-minimal-surface",
       "title": "Prefer Narrow, Well-Maintained Packages with Minimal Footprint",
       "impact": "MEDIUM-HIGH",
@@ -554,7 +554,7 @@
       ]
     },
     {
-      "skill": "security-review-best-practices",
+      "skill": "secure-coding-best-practices",
       "rule": "design-threat-modeling",
       "title": "Require Threat Models for New Features and Services",
       "impact": "HIGH",
@@ -580,7 +580,7 @@
       ]
     },
     {
-      "skill": "security-review-best-practices",
+      "skill": "secure-coding-best-practices",
       "rule": "error-graceful-degradation",
       "title": "Implement Circuit Breakers and Graceful Degradation",
       "impact": "MEDIUM",
@@ -606,7 +606,7 @@
       ]
     },
     {
-      "skill": "security-review-best-practices",
+      "skill": "secure-coding-best-practices",
       "rule": "error-no-sensitive-logs",
       "title": "Never Log Passwords, Tokens, or PII",
       "impact": "MEDIUM",
@@ -633,7 +633,7 @@
       ]
     },
     {
-      "skill": "security-review-best-practices",
+      "skill": "secure-coding-best-practices",
       "rule": "error-no-stack-traces",
       "title": "Never Expose Stack Traces or Internal Errors to Clients",
       "impact": "MEDIUM",
@@ -658,7 +658,7 @@
       ]
     },
     {
-      "skill": "security-review-best-practices",
+      "skill": "secure-coding-best-practices",
       "rule": "error-resource-cleanup",
       "title": "Ensure Exception-Safe Resource Cleanup",
       "impact": "MEDIUM",
@@ -684,7 +684,7 @@
       ]
     },
     {
-      "skill": "security-review-best-practices",
+      "skill": "secure-coding-best-practices",
       "rule": "error-security-events",
       "title": "Log All Authentication and Authorization Security Events",
       "impact": "MEDIUM",
@@ -711,7 +711,7 @@
       ]
     },
     {
-      "skill": "security-review-best-practices",
+      "skill": "secure-coding-best-practices",
       "rule": "infra-csp",
       "title": "Implement a Strict Content Security Policy (CSP)",
       "impact": "MEDIUM",
@@ -737,7 +737,7 @@
       ]
     },
     {
-      "skill": "security-review-best-practices",
+      "skill": "secure-coding-best-practices",
       "rule": "infra-least-privilege",
       "title": "Apply Least Privilege to Service Accounts and IAM Roles",
       "impact": "MEDIUM",
@@ -764,7 +764,7 @@
       ]
     },
     {
-      "skill": "security-review-best-practices",
+      "skill": "secure-coding-best-practices",
       "rule": "infra-security-headers",
       "title": "Set All Critical Security HTTP Headers",
       "impact": "MEDIUM",
@@ -791,7 +791,7 @@
       ]
     },
     {
-      "skill": "security-review-best-practices",
+      "skill": "secure-coding-best-practices",
       "rule": "input-command-injection",
       "title": "Never Construct Shell Commands from User Input",
       "impact": "CRITICAL",
@@ -817,7 +817,7 @@
       ]
     },
     {
-      "skill": "security-review-best-practices",
+      "skill": "secure-coding-best-practices",
       "rule": "input-deserialization",
       "title": "Avoid Unsafe Deserialization of Untrusted Data",
       "impact": "CRITICAL",
@@ -843,7 +843,7 @@
       ]
     },
     {
-      "skill": "security-review-best-practices",
+      "skill": "secure-coding-best-practices",
       "rule": "input-mass-assignment",
       "title": "Prevent Mass Assignment by Using Explicit Field Allowlists",
       "impact": "HIGH",
@@ -869,7 +869,7 @@
       ]
     },
     {
-      "skill": "security-review-best-practices",
+      "skill": "secure-coding-best-practices",
       "rule": "input-parameterized-queries",
       "title": "Use Parameterized Queries to Prevent SQL Injection",
       "impact": "CRITICAL",
@@ -895,7 +895,7 @@
       ]
     },
     {
-      "skill": "security-review-best-practices",
+      "skill": "secure-coding-best-practices",
       "rule": "input-path-traversal",
       "title": "Prevent Path Traversal by Validating File Paths",
       "impact": "CRITICAL",
@@ -920,7 +920,7 @@
       ]
     },
     {
-      "skill": "security-review-best-practices",
+      "skill": "secure-coding-best-practices",
       "rule": "input-validate-server-side",
       "title": "Validate and Sanitize All Input Server-Side",
       "impact": "CRITICAL",
@@ -946,7 +946,7 @@
       ]
     },
     {
-      "skill": "security-review-best-practices",
+      "skill": "secure-coding-best-practices",
       "rule": "input-xml-xxe",
       "title": "Disable External Entity Processing in XML Parsers (XXE)",
       "impact": "CRITICAL",
@@ -972,7 +972,7 @@
       ]
     },
     {
-      "skill": "security-review-best-practices",
+      "skill": "secure-coding-best-practices",
       "rule": "input-xss-prevention",
       "title": "Escape All Output Rendered as HTML to Prevent XSS",
       "impact": "CRITICAL",
@@ -999,7 +999,7 @@
       ]
     },
     {
-      "skill": "security-review-best-practices",
+      "skill": "secure-coding-best-practices",
       "rule": "sast-codeql",
       "title": "Enable GitHub CodeQL for Automated Vulnerability Discovery",
       "impact": "HIGH",
@@ -1026,7 +1026,7 @@
       ]
     },
     {
-      "skill": "security-review-best-practices",
+      "skill": "secure-coding-best-practices",
       "rule": "sast-semgrep",
       "title": "Use Semgrep for Custom Security Rule Enforcement",
       "impact": "HIGH",
@@ -1053,7 +1053,7 @@
       ]
     },
     {
-      "skill": "security-review-best-practices",
+      "skill": "secure-coding-best-practices",
       "rule": "sast-sonarqube",
       "title": "Integrate SonarQube or SonarCloud as a PR Quality Gate",
       "impact": "HIGH",
@@ -1081,7 +1081,7 @@
       ]
     },
     {
-      "skill": "security-review-best-practices",
+      "skill": "secure-coding-best-practices",
       "rule": "sca-cve-version-blocking",
       "title": "Block Builds When HIGH or CRITICAL CVE Versions Are Detected",
       "impact": "CRITICAL",
@@ -1111,7 +1111,7 @@
       ]
     },
     {
-      "skill": "security-review-best-practices",
+      "skill": "secure-coding-best-practices",
       "rule": "sca-jfrog-xray",
       "title": "Integrate JFrog Xray for Deep Artifact and Container SCA",
       "impact": "CRITICAL",
@@ -1140,7 +1140,7 @@
       ]
     },
     {
-      "skill": "security-review-best-practices",
+      "skill": "secure-coding-best-practices",
       "rule": "sca-owasp-dependency-check",
       "title": "Run OWASP Dependency Check for CVE Scanning in CI",
       "impact": "CRITICAL",
@@ -1168,7 +1168,7 @@
       ]
     },
     {
-      "skill": "security-review-best-practices",
+      "skill": "secure-coding-best-practices",
       "rule": "sca-sbom-generation",
       "title": "Generate and Publish a Software Bill of Materials (SBOM)",
       "impact": "CRITICAL",
@@ -1196,7 +1196,7 @@
       ]
     },
     {
-      "skill": "security-review-best-practices",
+      "skill": "secure-coding-best-practices",
       "rule": "sca-trivy-scan",
       "title": "Use Trivy to Scan Containers and Filesystems for CVEs",
       "impact": "CRITICAL",
@@ -1226,7 +1226,7 @@
       ]
     },
     {
-      "skill": "security-review-best-practices",
+      "skill": "secure-coding-best-practices",
       "rule": "secrets-env-management",
       "title": "Use a Secrets Manager Instead of Plain Environment Files",
       "impact": "CRITICAL",
@@ -1252,7 +1252,7 @@
       ]
     },
     {
-      "skill": "security-review-best-practices",
+      "skill": "secure-coding-best-practices",
       "rule": "secrets-no-hardcoded",
       "title": "Never Hardcode Secrets, API Keys, or Credentials",
       "impact": "CRITICAL",
@@ -1278,7 +1278,7 @@
       ]
     },
     {
-      "skill": "security-review-best-practices",
+      "skill": "secure-coding-best-practices",
       "rule": "secrets-rotation",
       "title": "Implement and Test Automatic Secret Rotation",
       "impact": "HIGH",
@@ -1304,7 +1304,7 @@
       ]
     },
     {
-      "skill": "security-review-best-practices",
+      "skill": "secure-coding-best-practices",
       "rule": "secrets-scanning",
       "title": "Scan Commits and CI for Leaked Secrets",
       "impact": "CRITICAL",

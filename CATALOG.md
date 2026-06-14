@@ -1,6 +1,6 @@
 # Skill Catalog
 
-> **Auto-generated** on Sun, 14 Jun 2026 09:12:18 GMT. Do not edit manually — run `npm run catalog` to regenerate.
+> **Auto-generated** on Sun, 14 Jun 2026 09:22:47 GMT. Do not edit manually — run `npm run catalog` to regenerate.
 
 **7 skill(s)** · **190 total rules**
 
@@ -16,7 +16,7 @@
 | [kotlin-webflux-best-practices](./kotlin-webflux-best-practices/) | Best practices for building highly scalable, non-blocking APIs using Kotlin a... | 20 | 2.0.0 | MIT |
 | [openshift-docker-best-practices](./openshift-docker-best-practices/) | Best practices for containerization and deployment to Red Hat OpenShift and K... | 20 | 2.0.0 | MIT |
 | [vercel-react-best-practices](./react-best-practices/) | React and Next.js performance optimization guidelines from Vercel Engineering... | 70 | 1.0.0 | MIT |
-| [security-review-best-practices](./security-review-best-practices/) | Static Application Security Testing (SAST) guidelines for web applications an... | 50 | 2.0.0 | MIT |
+| [secure-coding-best-practices](./secure-coding-best-practices/) | Static code analysis (SAST) guidelines and secure coding standards aligned wi... | 50 | 2.0.0 | MIT |
 
 ---
 
@@ -123,7 +123,7 @@ React and Next.js performance optimization guidelines from Vercel Engineering. T
 
 ---
 
-### security-review-best-practices
+### secure-coding-best-practices
 
 **Author:** Security Engineering
 **Version:** 2.0.0
@@ -131,12 +131,12 @@ React and Next.js performance optimization guidelines from Vercel Engineering. T
 **Rules:** 50
 **Tags:** security, owasp, owasp-top-10, owasp-2025, sast, authentication, authorization, injection, secrets, api, cryptography, jfrog-xray, sonarqube, semgrep, codeql, trivy, sca, cve, threat-modeling
 
-Static Application Security Testing (SAST) guidelines for web applications and APIs, aligned to OWASP Top 10:2025. Use this skill when writing, reviewing, or auditing source code for security vulnerabilities — covering authentication, input validation, injection prevention, secrets management, API security, data protection, dependency analysis, error handling, infrastructure hardening, SCA/CVE scanning, SAST tooling, and secure design.
+Static code analysis (SAST) guidelines and secure coding standards aligned with OWASP Top 10. Provides defensive programming patterns, input handling rules, robust cryptography, secure error logging, and standard authentication structures.
 
 **Files:**
-- [SKILL.md](./security-review-best-practices/SKILL.md) — Agent entry point
-- [AGENTS.md](./security-review-best-practices/AGENTS.md) — Compiled rules (agent-optimized)
-- [README.md](./security-review-best-practices/README.md) — Contributor guide
+- [SKILL.md](./secure-coding-best-practices/SKILL.md) — Agent entry point
+- [AGENTS.md](./secure-coding-best-practices/AGENTS.md) — Compiled rules (agent-optimized)
+- [README.md](./secure-coding-best-practices/README.md) — Contributor guide
 
 ---
 

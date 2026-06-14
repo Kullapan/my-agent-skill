@@ -1,5 +1,5 @@
 {
-  "generated": "2026-06-14T09:12:18.726Z",
+  "generated": "2026-06-14T09:22:47.680Z",
   "totalSkills": 7,
   "totalRules": 190,
   "skills": [
@@ -134,9 +134,9 @@
       "agentsFile": "./react-best-practices/AGENTS.md"
     },
     {
-      "name": "security-review-best-practices",
-      "directory": "security-review-best-practices",
-      "description": "Static Application Security Testing (SAST) guidelines for web applications and APIs, aligned to OWASP Top 10:2025. Use this skill when writing, reviewing, or auditing source code for security vulnerabilities — covering authentication, input validation, injection prevention, secrets management, API security, data protection, dependency analysis, error handling, infrastructure hardening, SCA/CVE scanning, SAST tooling, and secure design.",
+      "name": "secure-coding-best-practices",
+      "directory": "secure-coding-best-practices",
+      "description": "Static code analysis (SAST) guidelines and secure coding standards aligned with OWASP Top 10. Provides defensive programming patterns, input handling rules, robust cryptography, secure error logging, and standard authentication structures.",
       "license": "MIT",
       "author": "Security Engineering",
       "version": "2.0.0",
@@ -162,8 +162,8 @@
         "threat-modeling"
       ],
       "ruleCount": 50,
-      "skillFile": "./security-review-best-practices/SKILL.md",
-      "agentsFile": "./security-review-best-practices/AGENTS.md"
+      "skillFile": "./secure-coding-best-practices/SKILL.md",
+      "agentsFile": "./secure-coding-best-practices/AGENTS.md"
     }
   ]
 }

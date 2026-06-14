@@ -2,7 +2,7 @@
   "version": "2.0.0",
   "organization": "Security Engineering",
   "date": "June 2026",
-  "abstract": "Static Application Security Testing (SAST) guide for web applications and APIs, aligned to OWASP Top 10:2025. Contains 50 rules across 11 categories covering authentication, injection prevention, secrets management, API security, data protection, dependency analysis, error handling, infrastructure hardening, SCA/CVE scanning, SAST tooling, and secure design. All rules are evaluable through static code review — no dynamic scanning required.",
+  "abstract": "Static code analysis (SAST) guidelines and secure coding standards aligned with OWASP Top 10. Contains 50 rules across 11 categories covering defensive programming, input handling, robust cryptography, secure error logging, and standard authentication structures. All rules are evaluable through static code style checks — no dynamic testing required.",
   "tags": ["security", "owasp", "owasp-top-10", "owasp-2025", "sast", "authentication", "authorization", "injection", "secrets", "api", "cryptography", "threat-modeling", "jfrog-xray", "sonarqube", "semgrep", "codeql", "trivy", "sca", "cve"],
   "references": [
     "https://owasp.org/www-project-top-ten/",

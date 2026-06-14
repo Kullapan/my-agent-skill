@@ -18,7 +18,7 @@ Each skill contains:
 | Skill | Description | Version |
 |-------|-------------|---------|
 | [react-best-practices](./react-best-practices/) | React & Next.js performance optimization guidelines by Vercel Engineering | 1.0.0 |
-| [security-review-best-practices](./security-review-best-practices/) | Security review guidelines (OWASP, SAST/SCA scanners, dependency checks) | 1.0.0 |
+| [secure-coding-best-practices](./secure-coding-best-practices/) | Static code analysis (SAST) guidelines and secure coding standards (OWASP) | 2.0.0 |
 | [kotlin-webflux-best-practices](./kotlin-webflux-best-practices/) | Best practices for building highly scalable, non-blocking Kotlin WebFlux APIs | 1.0.0 |
 | [kotlin-restful-best-practices](./kotlin-restful-best-practices/) | Best practices for building standard Kotlin Spring MVC REST APIs | 1.0.0 |
 | [java-restful-best-practices](./java-restful-best-practices/) | Best practices for building standard Java Spring MVC REST APIs | 1.0.0 |

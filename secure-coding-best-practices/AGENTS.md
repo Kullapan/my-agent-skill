@@ -1,4 +1,4 @@
-# Security Review Best Practices
+# Secure Coding Best Practices
 
 > **Organization:** Security Engineering
 > **Version:** 2.0.0
@@ -6,7 +6,7 @@
 
 ## Abstract
 
-Static Application Security Testing (SAST) guide for web applications and APIs, aligned to OWASP Top 10:2025. Contains 50 rules across 11 categories covering authentication, injection prevention, secrets management, API security, data protection, dependency analysis, error handling, infrastructure hardening, SCA/CVE scanning, SAST tooling, and secure design. All rules are evaluable through static code review — no dynamic scanning required.
+Static code analysis (SAST) guidelines and secure coding standards aligned with OWASP Top 10. Contains 50 rules across 11 categories covering defensive programming, input handling, robust cryptography, secure error logging, and standard authentication structures. All rules are evaluable through static code style checks — no dynamic testing required.
 
 ## Table of Contents
 

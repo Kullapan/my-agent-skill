@@ -1,6 +1,6 @@
-# Security Review Best Practices
+# Secure Coding Best Practices
 
-A structured repository of security review rules optimized for agents and LLMs. Covers OWASP Top 10, API security, secrets management, and infrastructure hardening.
+A structured repository of secure programming rules optimized for agents and LLMs. Covers OWASP Top 10, API security, secrets management, and infrastructure hardening.
 
 ## Structure
 
@@ -16,9 +16,9 @@ A structured repository of security review rules optimized for agents and LLMs. 
 
 > **From the repo root**, use the shared npm scripts:
 > ```bash
-> node ../scripts/build-skill.js --skill security-review-best-practices
-> node ../scripts/validate-skill.js --skill security-review-best-practices
-> node ../scripts/extract-tests.js --skill security-review-best-practices
+> node ../scripts/build-skill.js --skill secure-coding-best-practices
+> node ../scripts/validate-skill.js --skill secure-coding-best-practices
+> node ../scripts/extract-tests.js --skill secure-coding-best-practices
 > ```
 
 ## Installing to Another Project
@@ -26,7 +26,7 @@ A structured repository of security review rules optimized for agents and LLMs. 
 To install this specific skill into a target project using the GitHub CLI (`gh`), navigate to your target project's root directory and run:
 
 ```bash
-gh skill install <OWNER>/<REPO> security-review-best-practices
+gh skill install <OWNER>/<REPO> secure-coding-best-practices
 ```
 
 ### Prerequisites
@@ -47,7 +47,7 @@ gh skill install <OWNER>/<REPO> security-review-best-practices
    - `infra-` for Infrastructure & HTTP Hardening (Section 8)
 3. Fill in the frontmatter and content
 4. Include a clear Vulnerable / Secure code example
-5. Run `node ../scripts/build-skill.js --skill security-review-best-practices` to regenerate `AGENTS.md`
+5. Run `node ../scripts/build-skill.js --skill secure-coding-best-practices` to regenerate `AGENTS.md`
 
 ## Rule File Structure
 
