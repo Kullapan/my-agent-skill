@@ -17,13 +17,8 @@ Full OS images like `ubuntu:24.04` or `node:22` include package managers, shells
 # ❌ Full Ubuntu image — ~600MB+ with shell, package manager, and hundreds of tools
 FROM ubuntu:24.04
 
-RUN apt-get update && apt-get install -y \
-    openjdk-21-jdk \
-    curl \
-    wget \
-    vim \
-    net-tools \
-    && rm -rf /var/lib/apt/lists/*
+RUN apt-get update
+RUN apt-get install -y openjdk-21-jdk curl wget vim net-tools
 
 COPY target/app.jar /app/app.jar
 WORKDIR /app

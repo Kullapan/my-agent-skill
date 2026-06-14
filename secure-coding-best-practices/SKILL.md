@@ -71,7 +71,7 @@ Reference these guidelines when:
 - `auth-jwt-validation` — Fully validate JWT signature, algorithm, and claims
 - `auth-session-management` — Use secure, HttpOnly, SameSite cookies
 - `auth-rbac` — Enforce role-based access control on every endpoint
-- `auth-token-expiry` — Set short-lived access tokens, rotate refresh tokens
+- `auth-session-expiry` — Set short-lived access JWTs, rotate refresh sessions
 - `auth-oauth-state` — Use state + PKCE in OAuth/OIDC flows
 - `auth-mfa` — Enforce MFA for privileged operations
 - `auth-ssrf-prevention` — Prevent SSRF with URL allowlists and private IP blocking

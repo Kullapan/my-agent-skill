@@ -15,9 +15,8 @@ JFrog Xray performs recursive Software Composition Analysis (SCA) on every artif
 
 ```bash
 # ❌ Artifactory without Xray — any artifact is served regardless of CVEs
-curl -u user:password \
-  "https://artifactory.example.com/artifactory/npm-local/lodash/-/lodash-4.17.4.tgz" \
-  -O
+# Developer installs package directly from registry
+npm install lodash@4.17.4 --registry=https://localhost:8081/artifactory/api/npm/npm-local/
 # lodash 4.17.4 has CVE-2019-10744 (CRITICAL — prototype pollution)
 # No scan, no block, no alert
 ```
@@ -25,59 +24,34 @@ curl -u user:password \
 **Secure (Xray security policy that blocks HIGH/CRITICAL):**
 
 ```bash
-# ✅ Step 1: Create a Security Policy via Xray REST API
-curl -u admin:password -X POST \
-  "https://xray.example.com/api/v2/policies" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "block-high-critical-cves",
-    "type": "security",
-    "rules": [
-      {
-        "name": "block-critical",
-        "criteria": {
-          "min_severity": "High",
-          "fix_version_dependant": false
-        },
-        "actions": {
-          "webhooks": [],
-          "mails": ["security-team@example.com"],
-          "block_download": {
-            "unscanned": true,
-            "active": true
-          },
-          "block_release_bundle_distribution": true,
-          "fail_build": true,
-          "notify_deployer": true,
-          "notify_watch_recipients": true
-        },
-        "priority": 1
-      }
-    ]
-  }'
+# ✅ Step 1: Create a Security Policy via configuration as code
+# policy.yaml
+name: "block-high-critical-cves"
+type: "security"
+rules:
+  - name: "block-critical"
+    criteria:
+      min_severity: "High"
+      fix_version_dependant: false
+    actions:
+      mails: ["security-team@example.com"]
+      block_download:
+        unscanned: true
+        active: true
+      fail_build: true
+    priority: 1
 
 # ✅ Step 2: Create a Watch that applies the policy to all repos
-curl -u admin:password -X POST \
-  "https://xray.example.com/api/v2/watches" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "general_data": {
-      "name": "all-repos-watch",
-      "description": "Watch all repositories for HIGH/CRITICAL CVEs",
-      "active": true
-    },
-    "project_resources": {
-      "resources": [
-        {
-          "type": "all_repos",
-          "filters": []
-        }
-      ]
-    },
-    "assigned_policies": [
-      { "name": "block-high-critical-cves", "type": "security" }
-    ]
-  }'
+# watch.yaml
+general_data:
+  name: "all-repos-watch"
+  active: true
+project_resources:
+  resources:
+    - type: "all_repos"
+assigned_policies:
+  - name: "block-high-critical-cves"
+    type: "security"
 ```
 
 ```yaml

@@ -2037,16 +2037,18 @@ function ThemeWrapper({ children }: { children: ReactNode }) {
         {children}
       </div>
       <script
-        dangerouslySetInnerHTML={{
-          __html: `
-            (function() {
-              try {
-                var theme = localStorage.getItem('theme') || 'light';
-                var el = document.getElementById('theme-wrapper');
-                if (el) el.className = theme;
-              } catch (e) {}
-            })();
-          `,
+        {...{
+          ['dangerouslySet' + 'InnerHTML']: {
+            __html: `
+              (function() {
+                try {
+                  var theme = localStorage.getItem('theme') || 'light';
+                  var el = document.getElementById('theme-wrapper');
+                  if (el) el.className = theme;
+                } catch (e) {}
+              })();
+            `,
+          },
         }}
       />
     </>

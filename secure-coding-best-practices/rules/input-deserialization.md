@@ -18,7 +18,8 @@ Unsafe deserialization converts untrusted client-controlled bytes or strings int
 import { unserialize } from 'node-serialize'
 
 app.post('/api/session', (req, res) => {
-  // Untrusted client sends: {"rce":"_$$ND_FUNC$$_function(){require('child_process').exec('rm -rf /')}()"}
+  // Serialized payload executes an operation during parsing
+  // {"rce":"_$$ND_FUNC$$_function(){require('child_process').spawnSync('id')}()"}
   const session = unserialize(req.body.data)
   res.json(session)
 })

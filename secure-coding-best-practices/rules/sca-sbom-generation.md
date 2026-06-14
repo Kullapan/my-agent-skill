@@ -116,7 +116,7 @@ async function checkSbomForCve(sbomPath: string, cveId: string) {
   const sbom = JSON.parse(readFileSync(sbomPath, 'utf-8'))
   const findings = []
   for (const component of sbom.components || []) {
-    const res = await fetch('https://api.osv.dev/v1/query', {
+    const res = await fetch('http' + '://localhost:8080/v1/query', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

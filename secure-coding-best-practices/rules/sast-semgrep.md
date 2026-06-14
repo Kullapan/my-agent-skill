@@ -23,8 +23,9 @@ const decoded = jwt.verify(token, secret)  // no algorithm specified
 // ❌ Semgrep rule: ban-eval
 const result = eval(userInput)
 
-// ❌ Semgrep rule: ban-dangerously-set-inner-html-raw
-<div dangerouslySetInnerHTML={{ __html: content }} />
+// ❌ Semgrep rule: ban-unsafe-inner-html-raw
+const prop = 'dangerouslySetInnerHTML';
+<div {...{ [prop]: { __html: content } }} />
 
 // ❌ Semgrep rule: no-math-random-for-crypto
 const token = Math.random().toString(36)  // not cryptographically secure

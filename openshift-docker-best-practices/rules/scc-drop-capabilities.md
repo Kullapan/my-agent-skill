@@ -11,7 +11,7 @@ tags: openshift, kubernetes, security, capabilities, least-privilege
 
 Linux capabilities split root's monolithic power into ~40 individual privileges. By default, containers retain a subset of these (e.g., `NET_RAW`, `MKNOD`, `AUDIT_WRITE`) that can be exploited for ARP spoofing, packet sniffing, or device creation. Dropping all capabilities and selectively adding back only what's required follows the principle of least privilege and is required by OpenShift's `restricted-v2` SCC.
 
-**Incorrect (no capability restrictions):**
+**Non-compliant (no capabilities dropped):**
 
 ```yaml
 # ❌ No capabilities block — container retains default capabilities including NET_RAW

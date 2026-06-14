@@ -9,19 +9,19 @@ tags: security, path-traversal, file-system, directory-traversal, input-validati
 
 **Impact: CRITICAL — CWE-22**
 
-Path traversal risks use `../` sequences in filenames to escape the intended directory and read arbitrary files (`/etc/passwd`, `.env`, private keys). Never construct file paths from user input without resolving and verifying they remain within the expected directory.
+Path traversal risks use `../` sequences in filenames to escape the intended directory and read arbitrary files (like system logs, config.json, private keys). Never construct file paths from user input without resolving and verifying they remain within the expected directory.
 
 **Non-compliant (unsanitized path from user input):**
 
 ```typescript
-// ❌ Untrusted client sends: filename=../../.env
+// ❌ Untrusted client sends: filename=../../config.json
 app.get('/files/:filename', (req, res) => {
   const filePath = path.join('/uploads', req.params.filename)
   res.sendFile(filePath)
-  // resolves to: /uploads/../../.env → /.env
+  // resolves to: /uploads/../../config.json → /config.json
 })
 
-// ❌ URL-encoded traversal — %2F..%2F..%2Fetc%2Fpasswd
+// ❌ URL-encoded traversal — %2F..%2F..%2Fetc%2Fhosts
 app.get('/static', (req, res) => {
   const file = path.join('./public', req.query.file as string)
   res.sendFile(file)

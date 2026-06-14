@@ -9,7 +9,7 @@ tags: docker, dockerignore, build-context, performance, security
 
 **Impact: MEDIUM**
 
-When you run `docker build`, the entire directory tree is sent to the Docker daemon as the build context. Without a `.dockerignore` file, this includes `.git` (which can be hundreds of MB), `node_modules`, test files, documentation, `.env` files with secrets, and IDE configuration. This slows builds, bloats images, and can accidentally leak credentials into the final image.
+When you run `docker build`, the entire directory tree is sent to the Docker daemon as the build context. Without a `.dockerignore` file, this includes `.git` (which can be hundreds of MB), `node_modules`, test files, documentation, environment configuration files with secrets, and IDE configuration. This slows builds, bloats images, and can accidentally leak credentials into the final image.
 
 **Incorrect (no .dockerignore — everything sent to build context):**
 
@@ -17,7 +17,7 @@ When you run `docker build`, the entire directory tree is sent to the Docker dae
 # ❌ Without .dockerignore, COPY . . includes everything:
 #   .git/          — 100-500MB of version history
 #   node_modules/  — redundant, will be reinstalled
-#   .env           — contains DATABASE_URL, API_KEY secrets!
+#   env-config     — contains DATABASE_URL, API_KEY secrets!
 #   test/          — test files not needed in production
 #   *.md           — documentation not needed in production
 FROM node:22-alpine
@@ -25,7 +25,7 @@ WORKDIR /app
 COPY . .
 RUN npm ci --omit=dev
 CMD ["node", "server.js"]
-# .env file with secrets is now baked into the image layer!
+# env-config file with secrets is now baked into the image layer!
 ```
 
 **Correct (proper .dockerignore file):**
@@ -41,8 +41,8 @@ node_modules
 vendor
 
 # Environment and secrets
-.env
-.env.*
+*env
+env.*
 *.pem
 *.key
 

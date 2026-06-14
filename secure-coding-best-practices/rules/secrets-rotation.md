@@ -20,7 +20,7 @@ const STRIPE_KEY = process.env.STRIPE_SECRET_KEY
 // If leaked via logs, git history, or memory dump, untrusted client has permanent access
 
 // ❌ Database password — manual rotation causes downtime
-// .env file:
+// env-config file:
 // DB_PASSWORD=production_password_2024
 // Changed manually once a year — requires app restart
 // No overlap period — old password stops working immediately

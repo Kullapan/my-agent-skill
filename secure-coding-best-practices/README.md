@@ -94,7 +94,7 @@ Reference: [OWASP link](https://cheatsheetseries.owasp.org/)
 
 | OWASP Top 10 | Covered By |
 |---|---|
-| A01 Broken Access Control | `auth-rbac`, `auth-token-expiry` |
+| A01 Broken Access Control | `auth-rbac`, `auth-session-expiry` |
 | A02 Cryptographic Failures | `data-encryption-*`, `data-tls-*`, `auth-password-hashing` |
 | A03 Injection | `input-parameterized-queries`, `input-command-injection`, `input-xml-xxe` |
 | A04 Insecure Design | `auth-mfa`, `api-idempotency`, `data-minimal-collection` |

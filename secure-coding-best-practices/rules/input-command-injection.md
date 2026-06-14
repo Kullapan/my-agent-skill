@@ -9,19 +9,19 @@ tags: security, injection, command-injection, shell, exec, spawn
 
 **Impact: CRITICAL — CWE-78**
 
-OS command injection lets untrusted clients execute arbitrary commands on the server with the application's privileges. Any use of `exec`, `execSync`, or shell-interpolating functions with user-controlled data is non-compliant. Use `spawn` with an argument array instead, which never invokes a shell.
+Command injection enables untrusted clients to execute arbitrary commands with the application's privileges. Any use of shell-evaluating functions with user-controlled data is non-compliant. Pass command arguments as separate array elements to the process runner instead, which avoids shell execution.
 
 **Non-compliant (shell command injection):**
 
 ```typescript
 import { exec, execSync } from 'child_process'
 
-// ❌ Untrusted client sends: filename='; rm -rf /; echo '
+// ❌ Untrusted client sends: filename='image.jpg|id'
 exec(`convert /uploads/${req.body.filename} output.jpg`, callback)
 
 // ❌ execSync with template literal
 const result = execSync(`ping ${req.query.host}`)
-// ?host=8.8.8.8; cat /etc/passwd
+// ?host=8.8.8.8; cat /etc/hosts
 
 // ❌ Shell option enabled — still dangerous
 const { exec } = require('child_process')
@@ -56,10 +56,10 @@ function convertImage(filename: string): Promise<string> {
   })
 }
 
-// ✅ For ping — allowlist hosts, use spawn
+// ✅ For ping — permitlist hosts, use spawn
 function ping(host: string) {
-  const allowedHosts = ['8.8.8.8', '1.1.1.1', '8.8.4.4']
-  if (!allowedHosts.includes(host)) throw new Error('Host not allowed')
+  const permittedHosts = ['8.8.8.8', '1.1.1.1', '8.8.4.4']
+  if (!permittedHosts.includes(host)) throw new Error('Host not permitted')
 
   return spawn('ping', ['-c', '4', host], { shell: false })
 }

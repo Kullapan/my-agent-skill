@@ -50,7 +50,7 @@ for (const skill of skills) {
   const result = spawnSync(
     process.execPath,
     [join(__dirname, 'build-skill.js'), '--skill', skill],
-    { cwd: ROOT, stdio: 'inherit', env: process.env }
+    { cwd: ROOT, stdio: 'inherit' }
   );
   if (result.status !== 0) {
     console.error(`❌ Build failed for: ${skill}`);

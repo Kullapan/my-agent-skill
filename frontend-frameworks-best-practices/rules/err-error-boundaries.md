@@ -76,7 +76,6 @@ function Dashboard() {
 **Correct (Vue — using `onErrorCaptured` to isolate failures):**
 
 ```vue
-<!-- ✅ ErrorBoundary component catches child errors and renders a fallback instead of crashing the app -->
 <script setup lang="ts">
 import { ref, onErrorCaptured } from "vue";
 
@@ -103,7 +102,6 @@ function retry() {
 ```
 
 ```vue
-<!-- ✅ Wrap each dashboard section so failures are isolated -->
 <template>
   <main class="dashboard">
     <header><h1>Analytics Dashboard</h1></header>

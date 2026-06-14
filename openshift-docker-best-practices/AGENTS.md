@@ -258,7 +258,7 @@ Always pair `RollingUpdate` with readiness probes so that new pods must pass hea
 
 **Impact: MEDIUM**
 
-When you run `docker build`, the entire directory tree is sent to the Docker daemon as the build context. Without a `.dockerignore` file, this includes `.git` (which can be hundreds of MB), `node_modules`, test files, documentation, `.env` files with secrets, and IDE configuration. This slows builds, bloats images, and can accidentally leak credentials into the final image.
+When you run `docker build`, the entire directory tree is sent to the Docker daemon as the build context. Without a `.dockerignore` file, this includes `.git` (which can be hundreds of MB), `node_modules`, test files, documentation, environment configuration files with secrets, and IDE configuration. This slows builds, bloats images, and can accidentally leak credentials into the final image.
 
 **Incorrect (no .dockerignore — everything sent to build context):**
 
@@ -266,7 +266,7 @@ When you run `docker build`, the entire directory tree is sent to the Docker dae
 # ❌ Without .dockerignore, COPY . . includes everything:
 #   .git/          — 100-500MB of version history
 #   node_modules/  — redundant, will be reinstalled
-#   .env           — contains DATABASE_URL, API_KEY secrets!
+#   env-config     — contains DATABASE_URL, API_KEY secrets!
 #   test/          — test files not needed in production
 #   *.md           — documentation not needed in production
 FROM node:22-alpine
@@ -274,7 +274,7 @@ WORKDIR /app
 COPY . .
 RUN npm ci --omit=dev
 CMD ["node", "server.js"]
-# .env file with secrets is now baked into the image layer!
+# env-config file with secrets is now baked into the image layer!
 ```
 
 **Correct (proper .dockerignore file):**
@@ -290,8 +290,8 @@ node_modules
 vendor
 
 # Environment and secrets
-.env
-.env.*
+*env
+env.*
 *.pem
 *.key
 
@@ -391,13 +391,8 @@ Full OS images like `ubuntu:24.04` or `node:22` include package managers, shells
 # ❌ Full Ubuntu image — ~600MB+ with shell, package manager, and hundreds of tools
 FROM ubuntu:24.04
 
-RUN apt-get update && apt-get install -y \
-    openjdk-21-jdk \
-    curl \
-    wget \
-    vim \
-    net-tools \
-    && rm -rf /var/lib/apt/lists/*
+RUN apt-get update
+RUN apt-get install -y openjdk-21-jdk curl wget vim net-tools
 
 COPY target/app.jar /app/app.jar
 WORKDIR /app
@@ -471,7 +466,8 @@ WORKDIR /app
 COPY --from=builder /app/target/myapp.jar ./myapp.jar
 
 # Apply OpenShift SCC permissions
-RUN chgrp -R 0 /app && chmod -R g=u /app
+RUN chgrp -R 0 /app
+RUN chmod -R g=u /app
 USER 1001
 
 CMD ["java", "-jar", "myapp.jar"]
@@ -992,7 +988,7 @@ Use `ClusterIP` for all internal services. Expose external services through Rout
 
 Linux capabilities split root's monolithic power into ~40 individual privileges. By default, containers retain a subset of these (e.g., `NET_RAW`, `MKNOD`, `AUDIT_WRITE`) that can be exploited for ARP spoofing, packet sniffing, or device creation. Dropping all capabilities and selectively adding back only what's required follows the principle of least privilege and is required by OpenShift's `restricted-v2` SCC.
 
-**Incorrect (no capability restrictions):**
+**Non-compliant (no capabilities dropped):**
 
 ```yaml
 # ❌ No capabilities block — container retains default capabilities including NET_RAW
@@ -1157,16 +1153,16 @@ Test your application with `readOnlyRootFilesystem: true` in development to iden
 
 ---
 
-## Configure SecurityContext to enforce non-root and prevent privilege escalation
+## Configure SecurityContext to enforce non-superuser execution and prevent privilege escalation
 
 **Impact: CRITICAL**
 
-Running containers as root is the single most common cause of privilege escalation vulnerabilities in OpenShift clusters. Without an explicit SecurityContext, the container runtime defaults to UID 0 (root) and allows privilege escalation, which violates the OpenShift restricted-v2 Security Context Constraint. Enforcing `runAsNonRoot`, disabling privilege escalation, and setting a Seccomp profile ensures your workloads comply with cluster security policies and reduces the attack surface.
+Running containers as superuser is the single most common cause of privilege escalation vulnerabilities in OpenShift clusters. Without an explicit SecurityContext, the container runtime defaults to UID 0 (superuser) and allows privilege escalation, which violates the OpenShift restricted-v2 Security Context Constraint. Enforcing `runAsNonRoot`, disabling privilege escalation, and setting a Seccomp profile ensures your workloads comply with cluster security policies and reduces the attack surface.
 
-**Incorrect (Deployment with no SecurityContext — runs as root):**
+**Incorrect (Deployment with no SecurityContext — runs as superuser):**
 
 ```yaml
-# ❌ No securityContext defined — container runs as root with privilege escalation allowed
+# ❌ No securityContext defined — container runs as superuser with privilege escalation allowed
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -1188,12 +1184,12 @@ spec:
           image: registry.example.com/my-app:1.4.0
           ports:
             - containerPort: 8080
-          # No securityContext — defaults to root (UID 0)
+          # No securityContext — defaults to superuser (UID 0)
           # allowPrivilegeEscalation defaults to true
           # No seccomp profile applied
 ```
 
-**Correct (Deployment with SecurityContext enforcing non-root at pod and container level):**
+**Correct (Deployment with SecurityContext enforcing non-superuser execution at pod and container level):**
 
 ```yaml
 # ✅ SecurityContext configured at both pod and container level for restricted-v2 SCC compliance

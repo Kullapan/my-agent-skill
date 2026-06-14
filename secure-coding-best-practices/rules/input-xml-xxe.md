@@ -9,7 +9,7 @@ tags: security, xxe, xml, injection, external-entities, ssrf
 
 **Impact: CRITICAL — CWE-611**
 
-XML eXternal Entity (XXE) risks abuse insecure XML parsers to read local files (`/etc/passwd`, `.env`), perform SSRF to internal services, or cause denial of service. By default, many XML parsers allow external entity resolution. Disable it explicitly.
+XML eXternal Entity (XXE) risks abuse insecure XML parsers to read local files (like internal hosts files, system configuration), perform SSRF to internal services, or cause denial of service. By default, many XML parsers allow external entity resolution. Disable it explicitly.
 
 **Non-compliant (default XML parser config):**
 

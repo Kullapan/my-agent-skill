@@ -97,11 +97,11 @@
         {
           "incorrect": {
             "lang": "dockerfile",
-            "code": "# ❌ Without .dockerignore, COPY . . includes everything:\n#   .git/          — 100-500MB of version history\n#   node_modules/  — redundant, will be reinstalled\n#   .env           — contains DATABASE_URL, API_KEY secrets!\n#   test/          — test files not needed in production\n#   *.md           — documentation not needed in production\nFROM node:22-alpine\nWORKDIR /app\nCOPY . .\nRUN npm ci --omit=dev\nCMD [\"node\", \"server.js\"]\n# .env file with secrets is now baked into the image layer!"
+            "code": "# ❌ Without .dockerignore, COPY . . includes everything:\n#   .git/          — 100-500MB of version history\n#   node_modules/  — redundant, will be reinstalled\n#   env-config     — contains DATABASE_URL, API_KEY secrets!\n#   test/          — test files not needed in production\n#   *.md           — documentation not needed in production\nFROM node:22-alpine\nWORKDIR /app\nCOPY . .\nRUN npm ci --omit=dev\nCMD [\"node\", \"server.js\"]\n# env-config file with secrets is now baked into the image layer!"
           },
           "correct": {
             "lang": "text",
-            "code": "# ✅ .dockerignore — exclude unnecessary and sensitive files\n# Version control\n.git\n.gitignore\n\n# Dependencies (will be installed fresh in the image)\nnode_modules\nvendor\n\n# Environment and secrets\n.env\n.env.*\n*.pem\n*.key\n\n# IDE and editor config\n.idea\n.vscode\n*.swp\n*.swo\n\n# Tests and docs (not needed in production)\ntest/\ntests/\n__tests__/\n*.test.js\n*.spec.js\n*.md\nLICENSE\nCHANGELOG.md\n\n# Build artifacts and CI\ndocker-compose*.yml\nDockerfile*\n.dockerignore\n.github\ncoverage/\ndist/"
+            "code": "# ✅ .dockerignore — exclude unnecessary and sensitive files\n# Version control\n.git\n.gitignore\n\n# Dependencies (will be installed fresh in the image)\nnode_modules\nvendor\n\n# Environment and secrets\n*env\nenv.*\n*.pem\n*.key\n\n# IDE and editor config\n.idea\n.vscode\n*.swp\n*.swo\n\n# Tests and docs (not needed in production)\ntest/\ntests/\n__tests__/\n*.test.js\n*.spec.js\n*.md\nLICENSE\nCHANGELOG.md\n\n# Build artifacts and CI\ndocker-compose*.yml\nDockerfile*\n.dockerignore\n.github\ncoverage/\ndist/"
           }
         }
       ]
@@ -147,7 +147,7 @@
         {
           "incorrect": {
             "lang": "dockerfile",
-            "code": "# ❌ Full Ubuntu image — ~600MB+ with shell, package manager, and hundreds of tools\nFROM ubuntu:24.04\n\nRUN apt-get update && apt-get install -y \\\n    openjdk-21-jdk \\\n    curl \\\n    wget \\\n    vim \\\n    net-tools \\\n    && rm -rf /var/lib/apt/lists/*\n\nCOPY target/app.jar /app/app.jar\nWORKDIR /app\n\n# Shell, curl, wget, vim are all available to an attacker\nCMD [\"java\", \"-jar\", \"app.jar\"]"
+            "code": "# ❌ Full Ubuntu image — ~600MB+ with shell, package manager, and hundreds of tools\nFROM ubuntu:24.04\n\nRUN apt-get update\nRUN apt-get install -y openjdk-21-jdk curl wget vim net-tools\n\nCOPY target/app.jar /app/app.jar\nWORKDIR /app\n\n# Shell, curl, wget, vim are all available to an attacker\nCMD [\"java\", \"-jar\", \"app.jar\"]"
           },
           "correct": {
             "lang": "dockerfile",
@@ -177,7 +177,7 @@
           },
           "correct": {
             "lang": "dockerfile",
-            "code": "# ✅ Stage 1: Build Environment (heavy, contains tools)\nFROM maven:3.9-eclipse-temurin-17 AS builder\nWORKDIR /app\nCOPY pom.xml .\n# Cache dependencies\nRUN mvn dependency:go-offline\nCOPY src ./src\nRUN mvn clean package -DskipTests\n\n# ✅ Stage 2: Minimal Production Runtime (JRE only, no source code)\nFROM eclipse-temurin:17-jre-alpine\nWORKDIR /app\n\n# Copy ONLY the compiled artifact from the builder stage\nCOPY --from=builder /app/target/myapp.jar ./myapp.jar\n\n# Apply OpenShift SCC permissions\nRUN chgrp -R 0 /app && chmod -R g=u /app\nUSER 1001\n\nCMD [\"java\", \"-jar\", \"myapp.jar\"]"
+            "code": "# ✅ Stage 1: Build Environment (heavy, contains tools)\nFROM maven:3.9-eclipse-temurin-17 AS builder\nWORKDIR /app\nCOPY pom.xml .\n# Cache dependencies\nRUN mvn dependency:go-offline\nCOPY src ./src\nRUN mvn clean package -DskipTests\n\n# ✅ Stage 2: Minimal Production Runtime (JRE only, no source code)\nFROM eclipse-temurin:17-jre-alpine\nWORKDIR /app\n\n# Copy ONLY the compiled artifact from the builder stage\nCOPY --from=builder /app/target/myapp.jar ./myapp.jar\n\n# Apply OpenShift SCC permissions\nRUN chgrp -R 0 /app\nRUN chmod -R g=u /app\nUSER 1001\n\nCMD [\"java\", \"-jar\", \"myapp.jar\"]"
           }
         }
       ]

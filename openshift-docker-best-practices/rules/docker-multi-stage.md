@@ -44,7 +44,8 @@ WORKDIR /app
 COPY --from=builder /app/target/myapp.jar ./myapp.jar
 
 # Apply OpenShift SCC permissions
-RUN chgrp -R 0 /app && chmod -R g=u /app
+RUN chgrp -R 0 /app
+RUN chmod -R g=u /app
 USER 1001
 
 CMD ["java", "-jar", "myapp.jar"]

@@ -119,7 +119,6 @@ function ProjectList() {
 **Correct (Vue — handling all four async states):**
 
 ```vue
-<!-- ✅ Explicit handling for loading, error, empty, and success states -->
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
 

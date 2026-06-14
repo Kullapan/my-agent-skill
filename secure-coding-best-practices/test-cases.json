@@ -201,15 +201,15 @@
     },
     {
       "skill": "secure-coding-best-practices",
-      "rule": "auth-token-expiry",
-      "title": "Use Short-Lived Access Tokens with Rotating Refresh Tokens",
+      "rule": "auth-session-expiry",
+      "title": "Use Short-Lived Access JWTs with Rotating Refresh Sessions",
       "impact": "CRITICAL",
       "tags": [
         "security",
         "authentication",
-        "tokens",
+        "sessions",
         "jwt",
-        "refresh-tokens",
+        "refresh-sessions",
         "expiry"
       ],
       "pairs": []

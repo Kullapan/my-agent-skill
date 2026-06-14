@@ -14,8 +14,8 @@ Tailwind CSS provides a complete set of responsive breakpoint prefixes (`sm:`, `
 **Incorrect (mixing manual media queries with Tailwind classes):**
 
 ```html
-<!-- ❌ Custom @media queries fight Tailwind's breakpoint system -->
 <style>
+  /* ❌ Custom @media queries fight Tailwind's breakpoint system */
   .dashboard-grid {
     display: flex;
     flex-direction: column;
@@ -37,11 +37,11 @@ Tailwind CSS provides a complete set of responsive breakpoint prefixes (`sm:`, `
 <div class="dashboard-grid p-4">
   <aside class="w-full bg-white rounded-lg shadow p-4">
     <h2 class="text-lg font-semibold">Filters</h2>
-    <!-- filter controls -->
+    <div>Filter controls</div>
   </aside>
   <main class="w-full bg-white rounded-lg shadow p-4">
     <h1 class="text-xl font-bold">Results</h1>
-    <!-- result cards -->
+    <div>Result cards</div>
   </main>
 </div>
 ```
@@ -49,15 +49,14 @@ Tailwind CSS provides a complete set of responsive breakpoint prefixes (`sm:`, `
 **Correct (using Tailwind responsive prefixes for mobile-first design):**
 
 ```html
-<!-- ✅ Mobile-first: base styles for small screens, responsive prefixes for larger ones -->
 <div class="flex flex-col gap-4 p-4 md:flex-row md:gap-6 lg:gap-8">
   <aside class="w-full md:w-64 lg:w-72 bg-white rounded-lg shadow p-4">
     <h2 class="text-lg font-semibold">Filters</h2>
-    <!-- filter controls -->
+    <div>Filter controls</div>
   </aside>
   <main class="w-full flex-1 bg-white rounded-lg shadow p-4">
     <h1 class="text-xl font-bold lg:text-2xl">Results</h1>
-    <!-- result cards -->
+    <div>Result cards</div>
   </main>
 </div>
 ```

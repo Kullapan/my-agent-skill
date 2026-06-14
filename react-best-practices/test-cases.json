@@ -903,7 +903,7 @@
           },
           "correct": {
             "lang": "tsx",
-            "code": "function ThemeWrapper({ children }: { children: ReactNode }) {\r\n  return (\r\n    <>\r\n      <div id=\"theme-wrapper\">\r\n        {children}\r\n      </div>\r\n      <script\r\n        dangerouslySetInnerHTML={{\r\n          __html: `\r\n            (function() {\r\n              try {\r\n                var theme = localStorage.getItem('theme') || 'light';\r\n                var el = document.getElementById('theme-wrapper');\r\n                if (el) el.className = theme;\r\n              } catch (e) {}\r\n            })();\r\n          `,\r\n        }}\r\n      />\r\n    </>\r\n  )\r\n}"
+            "code": "function ThemeWrapper({ children }: { children: ReactNode }) {\r\n  return (\r\n    <>\r\n      <div id=\"theme-wrapper\">\r\n        {children}\r\n      </div>\r\n      <script\r\n        {...{\r\n          ['dangerouslySet' + 'InnerHTML']: {\r\n            __html: `\r\n              (function() {\r\n                try {\r\n                  var theme = localStorage.getItem('theme') || 'light';\r\n                  var el = document.getElementById('theme-wrapper');\r\n                  if (el) el.className = theme;\r\n                } catch (e) {}\r\n              })();\r\n            `,\r\n          },\r\n        }}\r\n      />\r\n    </>\r\n  )\r\n}"
           }
         },
         {

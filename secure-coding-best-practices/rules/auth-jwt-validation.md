@@ -9,7 +9,7 @@ tags: security, authentication, jwt, tokens, signature, algorithm
 
 **Impact: CRITICAL — CWE-347**
 
-JWTs must be validated on every request: verify the signature, reject the `none` algorithm, enforce `alg` allowlist, and check `exp`, `iss`, and `aud` claims. Skipping any step allows untrusted clients to forge tokens, elevate privileges, or reuse expired tokens.
+JWTs must be validated on each request: verify the signature, reject the `none` algorithm, enforce `alg` permitlist, and check `exp`, `iss`, and `aud` claims. Skipping any step enables untrusted clients to forge JWTs, elevate privileges, or reuse expired credentials.
 
 **Non-compliant (incomplete validation):**
 
@@ -25,7 +25,7 @@ const payload = jwt.verify(token, secret) // if alg not locked down
 const payload = jwt.verify(token, secret, {})
 ```
 
-**Secure (strict validation with allowlist):**
+**Secure (strict validation with permitlist):**
 
 ```typescript
 import jwt from 'jsonwebtoken'
@@ -35,9 +35,9 @@ const JWT_ISSUER  = 'https://auth.example.com'
 const JWT_AUDIENCE = 'https://api.example.com'
 
 function verifyToken(token: string): JwtPayload {
-  // ✅ Allowlist algorithm — rejects 'none' and RS256/HS256 confusion
+  // ✅ Permitlist algorithm — rejects 'none' and RS256/HS256 confusion
   const payload = jwt.verify(token, JWT_SECRET, {
-    algorithms: ['HS256'],   // explicit allowlist only
+    algorithms: ['HS256'],   // explicit permitlist only
     issuer:    JWT_ISSUER,
     audience:  JWT_AUDIENCE,
     // exp is checked automatically by jsonwebtoken
@@ -59,6 +59,6 @@ app.get('/api/resource', (req, res) => {
 })
 ```
 
-Never trust `jwt.decode()` for authorization. Always specify an algorithm allowlist. Validate `iss` and `aud` to prevent token reuse across services.
+Never trust `jwt.decode()` for authorization. Always specify an algorithm permitlist. Validate `iss` and `aud` to prevent token reuse across services.
 
 Reference: [OWASP JWT Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/JSON_Web_Token_for_Java_Cheat_Sheet.html)

