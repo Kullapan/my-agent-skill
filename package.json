@@ -1,0 +1,26 @@
+{
+  "name": "shared-skill-library",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "A curated multi-skill library for AI agents and LLMs",
+  "private": true,
+  "scripts": {
+    "build": "node scripts/build-all.js",
+    "build:skill": "node scripts/build-skill.js",
+    "validate": "node scripts/validate-skill.js --all",
+    "catalog": "node scripts/generate-catalog.js",
+    "extract-tests": "node scripts/extract-tests.js --all",
+    "dev": "node scripts/build-all.js && node scripts/validate-skill.js --all && node scripts/generate-catalog.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "agent",
+    "llm",
+    "skill",
+    "best-practices",
+    "ai"
+  ],
+  "license": "MIT"
+}

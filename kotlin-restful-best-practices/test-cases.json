@@ -1,0 +1,136 @@
+{
+  "generated": "2026-06-14T07:05:17.955Z",
+  "skill": "kotlin-restful-best-practices",
+  "total": 5,
+  "testCases": [
+    {
+      "skill": "kotlin-restful-best-practices",
+      "rule": "design-data-classes",
+      "title": "Use immutable data classes for all API contracts",
+      "impact": "HIGH",
+      "tags": [
+        "kotlin",
+        "data-classes",
+        "immutability",
+        "rest",
+        "api",
+        "dtos"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "kotlin",
+            "code": "// ❌ Java-style mutable POJO in Kotlin\nclass UpdateUserRequest {\n    var email: String? = null\n    var name: String? = null\n    \n    // Missing toString(), equals(), hashCode()\n}"
+          },
+          "correct": {
+            "lang": "kotlin",
+            "code": "// ✅ Immutable data class\ndata class UpdateUserRequest(\n    val email: String,\n    val name: String?\n)"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "kotlin-restful-best-practices",
+      "rule": "design-dto-mapping",
+      "title": "Prevent entity exposure using DTOs and extension functions",
+      "impact": "CRITICAL",
+      "tags": [
+        "rest",
+        "api",
+        "dtos",
+        "mapping",
+        "security",
+        "kotlin",
+        "extension-functions"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "kotlin",
+            "code": "// ❌ Entity used directly in API request and response\n@Entity\n@Table(name = \"users\")\nclass User(\n    @Id @GeneratedValue val id: Long? = null,\n    var username: String,\n    var passwordHash: String, // 🚨 Leaked in response!\n    var isAdmin: Boolean = false\n)\n\n@RestController\n@RequestMapping(\"/users\")\nclass UserController(private val userRepository: UserRepository) {\n\n    @PostMapping\n    fun createUser(@RequestBody user: User): User {\n        // 🚨 Mass assignment: User can send {\"isAdmin\": true}\n        return userRepository.save(user)\n    }\n\n    @GetMapping(\"/{id}\")\n    fun getUser(@PathVariable id: Long): User {\n        // 🚨 Leaks passwordHash\n        return userRepository.findById(id).orElseThrow()\n    }\n}"
+          },
+          "correct": {
+            "lang": "kotlin",
+            "code": "// ✅ Distinct DTOs for Request and Response\ndata class UserCreateRequest(\n    val username: String,\n    val plaintextPassword: String // Handled securely, not an entity field\n)\n\ndata class UserResponse(\n    val id: Long,\n    val username: String\n)\n\n// ✅ Kotlin Extension function for mapping (cleaner than MapStruct for simple cases)\nfun User.toResponse() = UserResponse(\n    id = this.id ?: throw IllegalStateException(\"Entity must have ID\"),\n    username = this.username\n)\n\n@RestController\n@RequestMapping(\"/users\")\nclass UserController(\n    private val userRepository: UserRepository,\n    private val passwordEncoder: PasswordEncoder\n) {\n\n    @PostMapping\n    fun createUser(@RequestBody request: UserCreateRequest): UserResponse {\n        val user = User(\n            username = request.username,\n            passwordHash = passwordEncoder.encode(request.plaintextPassword),\n            isAdmin = false // Safe: controlled by server, not client request\n        )\n        return userRepository.save(user).toResponse()\n    }\n\n    @GetMapping(\"/{id}\")\n    fun getUser(@PathVariable id: Long): UserResponse {\n        val user = userRepository.findById(id)\n            .orElseThrow { NotFoundException(\"User not found\") }\n        return user.toResponse() // ✅ Safe response\n    }\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "kotlin-restful-best-practices",
+      "rule": "error-controller-advice",
+      "title": "Centralize exception handling with @RestControllerAdvice",
+      "impact": "HIGH",
+      "tags": [
+        "spring-boot",
+        "mvc",
+        "error-handling",
+        "controller-advice",
+        "exception-handler"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "kotlin",
+            "code": "// ❌ Repetitive and inconsistent error handling\n@GetMapping(\"/{id}\")\nfun getUser(@PathVariable id: Long): ResponseEntity<Any> {\n    return try {\n        val user = userService.findById(id)\n        ResponseEntity.ok(user)\n    } catch (e: NotFoundException) {\n        ResponseEntity.status(404).body(mapOf(\"error\" to \"Not Found\"))\n    } catch (e: Exception) {\n        // 🚨 Potentially leaks internal exception messages\n        ResponseEntity.status(500).body(e.message)\n    }\n}"
+          },
+          "correct": {
+            "lang": "kotlin",
+            "code": "// ✅ Define a standard error schema\ndata class ApiError(\n    val status: Int,\n    val message: String,\n    val timestamp: Instant = Instant.now()\n)\n\n// ✅ Custom Exceptions\nclass NotFoundException(message: String) : RuntimeException(message)\n\n// ✅ Centralized Handler\n@RestControllerAdvice\nclass GlobalExceptionHandler {\n\n    @ExceptionHandler(NotFoundException::class)\n    @ResponseStatus(HttpStatus.NOT_FOUND)\n    fun handleNotFound(ex: NotFoundException): ApiError {\n        return ApiError(404, ex.message ?: \"Resource not found\")\n    }\n\n    // Fallback for unexpected server errors\n    @ExceptionHandler(Exception::class)\n    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)\n    fun handleGenericException(ex: Exception): ApiError {\n        // Log the actual exception for developers\n        logger.error(\"Unhandled exception\", ex)\n        // Return a generic, safe message to the client\n        return ApiError(500, \"An unexpected error occurred\")\n    }\n}\n\n@RestController\n@RequestMapping(\"/users\")\nclass UserController(private val userService: UserService) {\n\n    // ✅ Clean controller, focuses only on the happy path\n    @GetMapping(\"/{id}\")\n    fun getUser(@PathVariable id: Long): UserResponse {\n        return userService.findById(id).toResponse()\n    }\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "kotlin-restful-best-practices",
+      "rule": "error-validation",
+      "title": "Use standard Bean Validation (@Valid) with Kotlin data classes",
+      "impact": "HIGH",
+      "tags": [
+        "kotlin",
+        "validation",
+        "spring-boot",
+        "mvc",
+        "rest",
+        "bean-validation"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "kotlin",
+            "code": "// ❌ Error-prone manual validation\n@PostMapping(\"/register\")\nfun registerUser(@RequestBody request: RegisterRequest): ResponseEntity<Any> {\n    if (request.email.isBlank() || !request.email.contains(\"@\")) {\n        return ResponseEntity.badRequest().body(\"Invalid email\")\n    }\n    if (request.password.length < 8) {\n        return ResponseEntity.badRequest().body(\"Password too short\")\n    }\n    // Proceed with registration...\n}"
+          },
+          "correct": {
+            "lang": "kotlin",
+            "code": "import jakarta.validation.constraints.Email\nimport jakarta.validation.constraints.NotBlank\nimport jakarta.validation.constraints.Size\nimport jakarta.validation.Valid\n\n// ✅ Validation annotations directly on the DTO\n// Note the @field: prefix, which is required for data classes in some Spring versions\ndata class RegisterRequest(\n    @field:NotBlank(message = \"Email is required\")\n    @field:Email(message = \"Invalid email format\")\n    val email: String,\n\n    @field:NotBlank\n    @field:Size(min = 8, message = \"Password must be at least 8 characters\")\n    val password: String\n)\n\n@RestController\n@RequestMapping(\"/users\")\nclass UserController {\n\n    // ✅ Use @Valid to trigger validation automatically\n    @PostMapping(\"/register\")\n    fun registerUser(@Valid @RequestBody request: RegisterRequest): UserResponse {\n        // If validation fails, Spring throws MethodArgumentNotValidException\n        // which should be handled globally in @RestControllerAdvice\n        return userService.register(request.email, request.password).toResponse()\n    }\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "kotlin-restful-best-practices",
+      "rule": "kotlin-null-safety",
+      "title": "Leverage Kotlin's null-safety system for optional API fields",
+      "impact": "HIGH",
+      "tags": [
+        "kotlin",
+        "null-safety",
+        "optional",
+        "rest",
+        "api"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "kotlin",
+            "code": "// ❌ Using Optional in DTOs and Repositories\ndata class UserRequest(\n    val email: String,\n    val nickname: Optional<String> // ❌ Unidiomatic\n)\n\ninterface UserRepository : JpaRepository<User, Long> {\n    // ❌ Spring Data supports Kotlin nullability, no need for Optional\n    fun findByEmail(email: String): Optional<User> \n}"
+          },
+          "correct": {
+            "lang": "kotlin",
+            "code": "// ✅ Use nullable types (?)\ndata class UserRequest(\n    val email: String,\n    val nickname: String? // Nullable field\n)\n\ninterface UserRepository : JpaRepository<User, Long> {\n    // ✅ Returns User if found, null if not\n    fun findByEmail(email: String): User? \n}\n\n@RestController\n@RequestMapping(\"/users\")\nclass UserController(private val repo: UserRepository) {\n    \n    @GetMapping\n    fun getUserByEmail(@RequestParam email: String): UserResponse {\n        // ✅ Idiomatic null handling (Elvis operator)\n        val user = repo.findByEmail(email) \n            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, \"User not found\")\n            \n        return user.toResponse()\n    }\n}"
+          }
+        }
+      ]
+    }
+  ]
+}

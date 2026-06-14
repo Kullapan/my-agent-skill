@@ -1,0 +1,1623 @@
+{
+  "generated": "2026-06-14T07:05:17.972Z",
+  "skill": "react-best-practices",
+  "total": 64,
+  "testCases": [
+    {
+      "skill": "react-best-practices",
+      "rule": "advanced-effect-event-deps",
+      "title": "Do Not Put Effect Events in Dependency Arrays",
+      "impact": "LOW",
+      "tags": [
+        "advanced",
+        "hooks",
+        "useEffectEvent",
+        "dependencies",
+        "effects"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "tsx",
+            "code": "import { useEffect, useEffectEvent } from 'react'\r\n\r\nfunction ChatRoom({ roomId, onConnected }: {\r\n  roomId: string\r\n  onConnected: () => void\r\n}) {\r\n  const handleConnected = useEffectEvent(onConnected)\r\n\r\n  useEffect(() => {\r\n    const connection = createConnection(roomId)\r\n    connection.on('connected', handleConnected)\r\n    connection.connect()\r\n\r\n    return () => connection.disconnect()\r\n  }, [roomId, handleConnected])\r\n}"
+          },
+          "correct": {
+            "lang": "tsx",
+            "code": "import { useEffect, useEffectEvent } from 'react'\r\n\r\nfunction ChatRoom({ roomId, onConnected }: {\r\n  roomId: string\r\n  onConnected: () => void\r\n}) {\r\n  const handleConnected = useEffectEvent(onConnected)\r\n\r\n  useEffect(() => {\r\n    const connection = createConnection(roomId)\r\n    connection.on('connected', handleConnected)\r\n    connection.connect()\r\n\r\n    return () => connection.disconnect()\r\n  }, [roomId])\r\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "react-best-practices",
+      "rule": "advanced-event-handler-refs",
+      "title": "Store Event Handlers in Refs",
+      "impact": "LOW",
+      "tags": [
+        "advanced",
+        "hooks",
+        "refs",
+        "event-handlers",
+        "optimization"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "tsx",
+            "code": "function useWindowEvent(event: string, handler: (e) => void) {\r\n  useEffect(() => {\r\n    window.addEventListener(event, handler)\r\n    return () => window.removeEventListener(event, handler)\r\n  }, [event, handler])\r\n}"
+          },
+          "correct": {
+            "lang": "tsx",
+            "code": "function useWindowEvent(event: string, handler: (e) => void) {\r\n  const handlerRef = useRef(handler)\r\n  useEffect(() => {\r\n    handlerRef.current = handler\r\n  }, [handler])\r\n\r\n  useEffect(() => {\r\n    const listener = (e) => handlerRef.current(e)\r\n    window.addEventListener(event, listener)\r\n    return () => window.removeEventListener(event, listener)\r\n  }, [event])\r\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "react-best-practices",
+      "rule": "advanced-init-once",
+      "title": "Initialize App Once, Not Per Mount",
+      "impact": "LOW-MEDIUM",
+      "tags": [
+        "initialization",
+        "useEffect",
+        "app-startup",
+        "side-effects"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "tsx",
+            "code": "function Comp() {\r\n  useEffect(() => {\r\n    loadFromStorage()\r\n    checkAuthToken()\r\n  }, [])\r\n\r\n  // ...\r\n}"
+          },
+          "correct": {
+            "lang": "tsx",
+            "code": "let didInit = false\r\n\r\nfunction Comp() {\r\n  useEffect(() => {\r\n    if (didInit) return\r\n    didInit = true\r\n    loadFromStorage()\r\n    checkAuthToken()\r\n  }, [])\r\n\r\n  // ...\r\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "react-best-practices",
+      "rule": "advanced-use-latest",
+      "title": "useEffectEvent for Stable Callback Refs",
+      "impact": "LOW",
+      "tags": [
+        "advanced",
+        "hooks",
+        "useEffectEvent",
+        "refs",
+        "optimization"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "tsx",
+            "code": "function SearchInput({ onSearch }: { onSearch: (q: string) => void }) {\r\n  const [query, setQuery] = useState('')\r\n\r\n  useEffect(() => {\r\n    const timeout = setTimeout(() => onSearch(query), 300)\r\n    return () => clearTimeout(timeout)\r\n  }, [query, onSearch])\r\n}"
+          },
+          "correct": {
+            "lang": "tsx",
+            "code": "import { useEffectEvent } from 'react';\r\n\r\nfunction SearchInput({ onSearch }: { onSearch: (q: string) => void }) {\r\n  const [query, setQuery] = useState('')\r\n  const onSearchEvent = useEffectEvent(onSearch)\r\n\r\n  useEffect(() => {\r\n    const timeout = setTimeout(() => onSearchEvent(query), 300)\r\n    return () => clearTimeout(timeout)\r\n  }, [query])\r\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "react-best-practices",
+      "rule": "async-api-routes",
+      "title": "Prevent Waterfall Chains in API Routes",
+      "impact": "CRITICAL",
+      "tags": [
+        "api-routes",
+        "server-actions",
+        "waterfalls",
+        "parallelization"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "typescript",
+            "code": "export async function GET(request: Request) {\r\n  const session = await auth()\r\n  const config = await fetchConfig()\r\n  const data = await fetchData(session.user.id)\r\n  return Response.json({ data, config })\r\n}"
+          },
+          "correct": {
+            "lang": "typescript",
+            "code": "export async function GET(request: Request) {\r\n  const sessionPromise = auth()\r\n  const configPromise = fetchConfig()\r\n  const session = await sessionPromise\r\n  const [config, data] = await Promise.all([\r\n    configPromise,\r\n    fetchData(session.user.id)\r\n  ])\r\n  return Response.json({ data, config })\r\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "react-best-practices",
+      "rule": "async-cheap-condition-before-await",
+      "title": "Check Cheap Conditions Before Async Flags",
+      "impact": "HIGH",
+      "tags": [
+        "async",
+        "await",
+        "feature-flags",
+        "short-circuit",
+        "conditional"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "typescript",
+            "code": "const someFlag = await getFlag()\r\n\r\nif (someFlag && someCondition) {\r\n  // ...\r\n}"
+          },
+          "correct": {
+            "lang": "typescript",
+            "code": "if (someCondition) {\r\n  const someFlag = await getFlag()\r\n  if (someFlag) {\r\n    // ...\r\n  }\r\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "react-best-practices",
+      "rule": "async-defer-await",
+      "title": "Defer Await Until Needed",
+      "impact": "HIGH",
+      "tags": [
+        "async",
+        "await",
+        "conditional",
+        "optimization"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "typescript",
+            "code": "async function handleRequest(userId: string, skipProcessing: boolean) {\r\n  const userData = await fetchUserData(userId)\r\n  \r\n  if (skipProcessing) {\r\n    // Returns immediately but still waited for userData\r\n    return { skipped: true }\r\n  }\r\n  \r\n  // Only this branch uses userData\r\n  return processUserData(userData)\r\n}"
+          },
+          "correct": {
+            "lang": "typescript",
+            "code": "async function handleRequest(userId: string, skipProcessing: boolean) {\r\n  if (skipProcessing) {\r\n    // Returns immediately without waiting\r\n    return { skipped: true }\r\n  }\r\n  \r\n  // Fetch only when needed\r\n  const userData = await fetchUserData(userId)\r\n  return processUserData(userData)\r\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "react-best-practices",
+      "rule": "async-dependencies",
+      "title": "Dependency-Based Parallelization",
+      "impact": "CRITICAL",
+      "tags": [
+        "async",
+        "parallelization",
+        "dependencies",
+        "better-all"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "typescript",
+            "code": "const [user, config] = await Promise.all([\r\n  fetchUser(),\r\n  fetchConfig()\r\n])\r\nconst profile = await fetchProfile(user.id)"
+          },
+          "correct": {
+            "lang": "typescript",
+            "code": "import { all } from 'better-all'\r\n\r\nconst { user, config, profile } = await all({\r\n  async user() { return fetchUser() },\r\n  async config() { return fetchConfig() },\r\n  async profile() {\r\n    return fetchProfile((await this.$.user).id)\r\n  }\r\n})"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "react-best-practices",
+      "rule": "async-parallel",
+      "title": "Promise.all() for Independent Operations",
+      "impact": "CRITICAL",
+      "tags": [
+        "async",
+        "parallelization",
+        "promises",
+        "waterfalls"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "typescript",
+            "code": "const user = await fetchUser()\r\nconst posts = await fetchPosts()\r\nconst comments = await fetchComments()"
+          },
+          "correct": {
+            "lang": "typescript",
+            "code": "const [user, posts, comments] = await Promise.all([\r\n  fetchUser(),\r\n  fetchPosts(),\r\n  fetchComments()\r\n])"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "react-best-practices",
+      "rule": "async-suspense-boundaries",
+      "title": "Strategic Suspense Boundaries",
+      "impact": "HIGH",
+      "tags": [
+        "async",
+        "suspense",
+        "streaming",
+        "layout-shift"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "tsx",
+            "code": "async function Page() {\r\n  const data = await fetchData() // Blocks entire page\r\n  \r\n  return (\r\n    <div>\r\n      <div>Sidebar</div>\r\n      <div>Header</div>\r\n      <div>\r\n        <DataDisplay data={data} />\r\n      </div>\r\n      <div>Footer</div>\r\n    </div>\r\n  )\r\n}"
+          },
+          "correct": {
+            "lang": "tsx",
+            "code": "function Page() {\r\n  return (\r\n    <div>\r\n      <div>Sidebar</div>\r\n      <div>Header</div>\r\n      <div>\r\n        <Suspense fallback={<Skeleton />}>\r\n          <DataDisplay />\r\n        </Suspense>\r\n      </div>\r\n      <div>Footer</div>\r\n    </div>\r\n  )\r\n}\r\n\r\nasync function DataDisplay() {\r\n  const data = await fetchData() // Only blocks this component\r\n  return <div>{data.content}</div>\r\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "react-best-practices",
+      "rule": "bundle-analyzable-paths",
+      "title": "Prefer Statically Analyzable Paths",
+      "impact": "HIGH",
+      "tags": [
+        "bundle",
+        "nextjs",
+        "vite",
+        "webpack",
+        "rollup",
+        "esbuild",
+        "path"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "ts",
+            "code": "const PAGE_MODULES = {\r\n  home: './pages/home',\r\n  settings: './pages/settings',\r\n} as const\r\n\r\nconst Page = await import(PAGE_MODULES[pageName])"
+          },
+          "correct": {
+            "lang": "ts",
+            "code": "const PAGE_MODULES = {\r\n  home: () => import('./pages/home'),\r\n  settings: () => import('./pages/settings'),\r\n} as const\r\n\r\nconst Page = await PAGE_MODULES[pageName]()"
+          }
+        },
+        {
+          "incorrect": {
+            "lang": "ts",
+            "code": "const baseDir = path.join(process.cwd(), 'content/' + contentKind)"
+          },
+          "correct": {
+            "lang": "ts",
+            "code": "const baseDir =\r\n  kind === ContentKind.Blog\r\n    ? path.join(process.cwd(), 'content/blog')\r\n    : path.join(process.cwd(), 'content/docs')"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "react-best-practices",
+      "rule": "bundle-barrel-imports",
+      "title": "Avoid Barrel File Imports",
+      "impact": "CRITICAL",
+      "tags": [
+        "bundle",
+        "imports",
+        "tree-shaking",
+        "barrel-files",
+        "performance"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "tsx",
+            "code": "import { Check, X, Menu } from 'lucide-react'\r\n// Loads 1,583 modules, takes ~2.8s extra in dev\r\n// Runtime cost: 200-800ms on every cold start\r\n\r\nimport { Button, TextField } from '@mui/material'\r\n// Loads 2,225 modules, takes ~4.2s extra in dev"
+          },
+          "correct": {
+            "lang": "js",
+            "code": "// next.config.js - automatically optimizes barrel imports at build time\r\nmodule.exports = {\r\n  experimental: {\r\n    optimizePackageImports: ['lucide-react', '@mui/material']\r\n  }\r\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "react-best-practices",
+      "rule": "bundle-defer-third-party",
+      "title": "Defer Non-Critical Third-Party Libraries",
+      "impact": "MEDIUM",
+      "tags": [
+        "bundle",
+        "third-party",
+        "analytics",
+        "defer"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "tsx",
+            "code": "import { Analytics } from '@vercel/analytics/react'\r\n\r\nexport default function RootLayout({ children }) {\r\n  return (\r\n    <html>\r\n      <body>\r\n        {children}\r\n        <Analytics />\r\n      </body>\r\n    </html>\r\n  )\r\n}"
+          },
+          "correct": {
+            "lang": "tsx",
+            "code": "import dynamic from 'next/dynamic'\r\n\r\nconst Analytics = dynamic(\r\n  () => import('@vercel/analytics/react').then(m => m.Analytics),\r\n  { ssr: false }\r\n)\r\n\r\nexport default function RootLayout({ children }) {\r\n  return (\r\n    <html>\r\n      <body>\r\n        {children}\r\n        <Analytics />\r\n      </body>\r\n    </html>\r\n  )\r\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "react-best-practices",
+      "rule": "bundle-dynamic-imports",
+      "title": "Dynamic Imports for Heavy Components",
+      "impact": "CRITICAL",
+      "tags": [
+        "bundle",
+        "dynamic-import",
+        "code-splitting",
+        "next-dynamic"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "tsx",
+            "code": "import { MonacoEditor } from './monaco-editor'\r\n\r\nfunction CodePanel({ code }: { code: string }) {\r\n  return <MonacoEditor value={code} />\r\n}"
+          },
+          "correct": {
+            "lang": "tsx",
+            "code": "import dynamic from 'next/dynamic'\r\n\r\nconst MonacoEditor = dynamic(\r\n  () => import('./monaco-editor').then(m => m.MonacoEditor),\r\n  { ssr: false }\r\n)\r\n\r\nfunction CodePanel({ code }: { code: string }) {\r\n  return <MonacoEditor value={code} />\r\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "react-best-practices",
+      "rule": "client-event-listeners",
+      "title": "Deduplicate Global Event Listeners",
+      "impact": "LOW",
+      "tags": [
+        "client",
+        "swr",
+        "event-listeners",
+        "subscription"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "tsx",
+            "code": "function useKeyboardShortcut(key: string, callback: () => void) {\r\n  useEffect(() => {\r\n    const handler = (e: KeyboardEvent) => {\r\n      if (e.metaKey && e.key === key) {\r\n        callback()\r\n      }\r\n    }\r\n    window.addEventListener('keydown', handler)\r\n    return () => window.removeEventListener('keydown', handler)\r\n  }, [key, callback])\r\n}"
+          },
+          "correct": {
+            "lang": "tsx",
+            "code": "import useSWRSubscription from 'swr/subscription'\r\n\r\n// Module-level Map to track callbacks per key\r\nconst keyCallbacks = new Map<string, Set<() => void>>()\r\n\r\nfunction useKeyboardShortcut(key: string, callback: () => void) {\r\n  // Register this callback in the Map\r\n  useEffect(() => {\r\n    if (!keyCallbacks.has(key)) {\r\n      keyCallbacks.set(key, new Set())\r\n    }\r\n    keyCallbacks.get(key)!.add(callback)\r\n\r\n    return () => {\r\n      const set = keyCallbacks.get(key)\r\n      if (set) {\r\n        set.delete(callback)\r\n        if (set.size === 0) {\r\n          keyCallbacks.delete(key)\r\n        }\r\n      }\r\n    }\r\n  }, [key, callback])\r\n\r\n  useSWRSubscription('global-keydown', () => {\r\n    const handler = (e: KeyboardEvent) => {\r\n      if (e.metaKey && keyCallbacks.has(e.key)) {\r\n        keyCallbacks.get(e.key)!.forEach(cb => cb())\r\n      }\r\n    }\r\n    window.addEventListener('keydown', handler)\r\n    return () => window.removeEventListener('keydown', handler)\r\n  })\r\n}\r\n\r\nfunction Profile() {\r\n  // Multiple shortcuts will share the same listener\r\n  useKeyboardShortcut('p', () => { /* ... */ }) \r\n  useKeyboardShortcut('k', () => { /* ... */ })\r\n  // ...\r\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "react-best-practices",
+      "rule": "client-localstorage-schema",
+      "title": "Version and Minimize localStorage Data",
+      "impact": "MEDIUM",
+      "tags": [
+        "client",
+        "localStorage",
+        "storage",
+        "versioning",
+        "data-minimization"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "typescript",
+            "code": "// No version, stores everything, no error handling\r\nlocalStorage.setItem('userConfig', JSON.stringify(fullUserObject))\r\nconst data = localStorage.getItem('userConfig')"
+          },
+          "correct": {
+            "lang": "typescript",
+            "code": "const VERSION = 'v2'\r\n\r\nfunction saveConfig(config: { theme: string; language: string }) {\r\n  try {\r\n    localStorage.setItem(`userConfig:${VERSION}`, JSON.stringify(config))\r\n  } catch {\r\n    // Throws in incognito/private browsing, quota exceeded, or disabled\r\n  }\r\n}\r\n\r\nfunction loadConfig() {\r\n  try {\r\n    const data = localStorage.getItem(`userConfig:${VERSION}`)\r\n    return data ? JSON.parse(data) : null\r\n  } catch {\r\n    return null\r\n  }\r\n}\r\n\r\n// Migration from v1 to v2\r\nfunction migrate() {\r\n  try {\r\n    const v1 = localStorage.getItem('userConfig:v1')\r\n    if (v1) {\r\n      const old = JSON.parse(v1)\r\n      saveConfig({ theme: old.darkMode ? 'dark' : 'light', language: old.lang })\r\n      localStorage.removeItem('userConfig:v1')\r\n    }\r\n  } catch {}\r\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "react-best-practices",
+      "rule": "client-passive-event-listeners",
+      "title": "Use Passive Event Listeners for Scrolling Performance",
+      "impact": "MEDIUM",
+      "tags": [
+        "client",
+        "event-listeners",
+        "scrolling",
+        "performance",
+        "touch",
+        "wheel"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "typescript",
+            "code": "useEffect(() => {\r\n  const handleTouch = (e: TouchEvent) => console.log(e.touches[0].clientX)\r\n  const handleWheel = (e: WheelEvent) => console.log(e.deltaY)\r\n  \r\n  document.addEventListener('touchstart', handleTouch)\r\n  document.addEventListener('wheel', handleWheel)\r\n  \r\n  return () => {\r\n    document.removeEventListener('touchstart', handleTouch)\r\n    document.removeEventListener('wheel', handleWheel)\r\n  }\r\n}, [])"
+          },
+          "correct": {
+            "lang": "typescript",
+            "code": "useEffect(() => {\r\n  const handleTouch = (e: TouchEvent) => console.log(e.touches[0].clientX)\r\n  const handleWheel = (e: WheelEvent) => console.log(e.deltaY)\r\n  \r\n  document.addEventListener('touchstart', handleTouch, { passive: true })\r\n  document.addEventListener('wheel', handleWheel, { passive: true })\r\n  \r\n  return () => {\r\n    document.removeEventListener('touchstart', handleTouch)\r\n    document.removeEventListener('wheel', handleWheel)\r\n  }\r\n}, [])"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "react-best-practices",
+      "rule": "client-swr-dedup",
+      "title": "Use SWR for Automatic Deduplication",
+      "impact": "MEDIUM-HIGH",
+      "tags": [
+        "client",
+        "swr",
+        "deduplication",
+        "data-fetching"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "tsx",
+            "code": "function UserList() {\r\n  const [users, setUsers] = useState([])\r\n  useEffect(() => {\r\n    fetch('/api/users')\r\n      .then(r => r.json())\r\n      .then(setUsers)\r\n  }, [])\r\n}"
+          },
+          "correct": {
+            "lang": "tsx",
+            "code": "import useSWR from 'swr'\r\n\r\nfunction UserList() {\r\n  const { data: users } = useSWR('/api/users', fetcher)\r\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "react-best-practices",
+      "rule": "js-batch-dom-css",
+      "title": "Avoid Layout Thrashing",
+      "impact": "MEDIUM",
+      "tags": [
+        "javascript",
+        "dom",
+        "css",
+        "performance",
+        "reflow",
+        "layout-thrashing"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "typescript",
+            "code": "function layoutThrashing(element: HTMLElement) {\r\n  element.style.width = '100px'\r\n  const width = element.offsetWidth  // Forces reflow\r\n  element.style.height = '200px'\r\n  const height = element.offsetHeight  // Forces another reflow\r\n}"
+          },
+          "correct": {
+            "lang": "typescript",
+            "code": "function updateElementStyles(element: HTMLElement) {\r\n  // Batch all writes together\r\n  element.style.width = '100px'\r\n  element.style.height = '200px'\r\n  element.style.backgroundColor = 'blue'\r\n  element.style.border = '1px solid black'\r\n  \r\n  // Read after all writes are done (single reflow)\r\n  const { width, height } = element.getBoundingClientRect()\r\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "react-best-practices",
+      "rule": "js-cache-function-results",
+      "title": "Cache Repeated Function Calls",
+      "impact": "MEDIUM",
+      "tags": [
+        "javascript",
+        "cache",
+        "memoization",
+        "performance"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "typescript",
+            "code": "function ProjectList({ projects }: { projects: Project[] }) {\r\n  return (\r\n    <div>\r\n      {projects.map(project => {\r\n        // slugify() called 100+ times for same project names\r\n        const slug = slugify(project.name)\r\n        \r\n        return <ProjectCard key={project.id} slug={slug} />\r\n      })}\r\n    </div>\r\n  )\r\n}"
+          },
+          "correct": {
+            "lang": "typescript",
+            "code": "// Module-level cache\r\nconst slugifyCache = new Map<string, string>()\r\n\r\nfunction cachedSlugify(text: string): string {\r\n  if (slugifyCache.has(text)) {\r\n    return slugifyCache.get(text)!\r\n  }\r\n  const result = slugify(text)\r\n  slugifyCache.set(text, result)\r\n  return result\r\n}\r\n\r\nfunction ProjectList({ projects }: { projects: Project[] }) {\r\n  return (\r\n    <div>\r\n      {projects.map(project => {\r\n        // Computed only once per unique project name\r\n        const slug = cachedSlugify(project.name)\r\n        \r\n        return <ProjectCard key={project.id} slug={slug} />\r\n      })}\r\n    </div>\r\n  )\r\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "react-best-practices",
+      "rule": "js-cache-property-access",
+      "title": "Cache Property Access in Loops",
+      "impact": "LOW-MEDIUM",
+      "tags": [
+        "javascript",
+        "loops",
+        "optimization",
+        "caching"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "typescript",
+            "code": "for (let i = 0; i < arr.length; i++) {\r\n  process(obj.config.settings.value)\r\n}"
+          },
+          "correct": {
+            "lang": "typescript",
+            "code": "const value = obj.config.settings.value\r\nconst len = arr.length\r\nfor (let i = 0; i < len; i++) {\r\n  process(value)\r\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "react-best-practices",
+      "rule": "js-cache-storage",
+      "title": "Cache Storage API Calls",
+      "impact": "LOW-MEDIUM",
+      "tags": [
+        "javascript",
+        "localStorage",
+        "storage",
+        "caching",
+        "performance"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "typescript",
+            "code": "function getTheme() {\r\n  return localStorage.getItem('theme') ?? 'light'\r\n}\r\n// Called 10 times = 10 storage reads"
+          },
+          "correct": {
+            "lang": "typescript",
+            "code": "const storageCache = new Map<string, string | null>()\r\n\r\nfunction getLocalStorage(key: string) {\r\n  if (!storageCache.has(key)) {\r\n    storageCache.set(key, localStorage.getItem(key))\r\n  }\r\n  return storageCache.get(key)\r\n}\r\n\r\nfunction setLocalStorage(key: string, value: string) {\r\n  localStorage.setItem(key, value)\r\n  storageCache.set(key, value)  // keep cache in sync\r\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "react-best-practices",
+      "rule": "js-combine-iterations",
+      "title": "Combine Multiple Array Iterations",
+      "impact": "LOW-MEDIUM",
+      "tags": [
+        "javascript",
+        "arrays",
+        "loops",
+        "performance"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "typescript",
+            "code": "const admins = users.filter(u => u.isAdmin)\r\nconst testers = users.filter(u => u.isTester)\r\nconst inactive = users.filter(u => !u.isActive)"
+          },
+          "correct": {
+            "lang": "typescript",
+            "code": "const admins: User[] = []\r\nconst testers: User[] = []\r\nconst inactive: User[] = []\r\n\r\nfor (const user of users) {\r\n  if (user.isAdmin) admins.push(user)\r\n  if (user.isTester) testers.push(user)\r\n  if (!user.isActive) inactive.push(user)\r\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "react-best-practices",
+      "rule": "js-early-exit",
+      "title": "Early Return from Functions",
+      "impact": "LOW-MEDIUM",
+      "tags": [
+        "javascript",
+        "functions",
+        "optimization",
+        "early-return"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "typescript",
+            "code": "function validateUsers(users: User[]) {\r\n  let hasError = false\r\n  let errorMessage = ''\r\n  \r\n  for (const user of users) {\r\n    if (!user.email) {\r\n      hasError = true\r\n      errorMessage = 'Email required'\r\n    }\r\n    if (!user.name) {\r\n      hasError = true\r\n      errorMessage = 'Name required'\r\n    }\r\n    // Continues checking all users even after error found\r\n  }\r\n  \r\n  return hasError ? { valid: false, error: errorMessage } : { valid: true }\r\n}"
+          },
+          "correct": {
+            "lang": "typescript",
+            "code": "function validateUsers(users: User[]) {\r\n  for (const user of users) {\r\n    if (!user.email) {\r\n      return { valid: false, error: 'Email required' }\r\n    }\r\n    if (!user.name) {\r\n      return { valid: false, error: 'Name required' }\r\n    }\r\n  }\r\n\r\n  return { valid: true }\r\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "react-best-practices",
+      "rule": "js-flatmap-filter",
+      "title": "Use flatMap to Map and Filter in One Pass",
+      "impact": "LOW-MEDIUM",
+      "tags": [
+        "javascript",
+        "arrays",
+        "flatMap",
+        "filter",
+        "performance"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "typescript",
+            "code": "const userNames = users\r\n  .map(user => user.isActive ? user.name : null)\r\n  .filter(Boolean)"
+          },
+          "correct": {
+            "lang": "typescript",
+            "code": "const userNames = users.flatMap(user =>\r\n  user.isActive ? [user.name] : []\r\n)"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "react-best-practices",
+      "rule": "js-hoist-regexp",
+      "title": "Hoist RegExp Creation",
+      "impact": "LOW-MEDIUM",
+      "tags": [
+        "javascript",
+        "regexp",
+        "optimization",
+        "memoization"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "tsx",
+            "code": "function Highlighter({ text, query }: Props) {\r\n  const regex = new RegExp(`(${query})`, 'gi')\r\n  const parts = text.split(regex)\r\n  return <>{parts.map((part, i) => ...)}</>\r\n}"
+          },
+          "correct": {
+            "lang": "tsx",
+            "code": "const EMAIL_REGEX = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/\r\n\r\nfunction Highlighter({ text, query }: Props) {\r\n  const regex = useMemo(\r\n    () => new RegExp(`(${escapeRegex(query)})`, 'gi'),\r\n    [query]\r\n  )\r\n  const parts = text.split(regex)\r\n  return <>{parts.map((part, i) => ...)}</>\r\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "react-best-practices",
+      "rule": "js-index-maps",
+      "title": "Build Index Maps for Repeated Lookups",
+      "impact": "LOW-MEDIUM",
+      "tags": [
+        "javascript",
+        "map",
+        "indexing",
+        "optimization",
+        "performance"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "typescript",
+            "code": "function processOrders(orders: Order[], users: User[]) {\r\n  return orders.map(order => ({\r\n    ...order,\r\n    user: users.find(u => u.id === order.userId)\r\n  }))\r\n}"
+          },
+          "correct": {
+            "lang": "typescript",
+            "code": "function processOrders(orders: Order[], users: User[]) {\r\n  const userById = new Map(users.map(u => [u.id, u]))\r\n\r\n  return orders.map(order => ({\r\n    ...order,\r\n    user: userById.get(order.userId)\r\n  }))\r\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "react-best-practices",
+      "rule": "js-length-check-first",
+      "title": "Early Length Check for Array Comparisons",
+      "impact": "MEDIUM-HIGH",
+      "tags": [
+        "javascript",
+        "arrays",
+        "performance",
+        "optimization",
+        "comparison"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "typescript",
+            "code": "function hasChanges(current: string[], original: string[]) {\r\n  // Always sorts and joins, even when lengths differ\r\n  return current.sort().join() !== original.sort().join()\r\n}"
+          },
+          "correct": {
+            "lang": "typescript",
+            "code": "function hasChanges(current: string[], original: string[]) {\r\n  // Early return if lengths differ\r\n  if (current.length !== original.length) {\r\n    return true\r\n  }\r\n  // Only sort when lengths match\r\n  const currentSorted = current.toSorted()\r\n  const originalSorted = original.toSorted()\r\n  for (let i = 0; i < currentSorted.length; i++) {\r\n    if (currentSorted[i] !== originalSorted[i]) {\r\n      return true\r\n    }\r\n  }\r\n  return false\r\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "react-best-practices",
+      "rule": "js-min-max-loop",
+      "title": "Use Loop for Min/Max Instead of Sort",
+      "impact": "LOW",
+      "tags": [
+        "javascript",
+        "arrays",
+        "performance",
+        "sorting",
+        "algorithms"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "typescript",
+            "code": "interface Project {\r\n  id: string\r\n  name: string\r\n  updatedAt: number\r\n}\r\n\r\nfunction getLatestProject(projects: Project[]) {\r\n  const sorted = [...projects].sort((a, b) => b.updatedAt - a.updatedAt)\r\n  return sorted[0]\r\n}"
+          },
+          "correct": {
+            "lang": "typescript",
+            "code": "function getLatestProject(projects: Project[]) {\r\n  if (projects.length === 0) return null\r\n  \r\n  let latest = projects[0]\r\n  \r\n  for (let i = 1; i < projects.length; i++) {\r\n    if (projects[i].updatedAt > latest.updatedAt) {\r\n      latest = projects[i]\r\n    }\r\n  }\r\n  \r\n  return latest\r\n}\r\n\r\nfunction getOldestAndNewest(projects: Project[]) {\r\n  if (projects.length === 0) return { oldest: null, newest: null }\r\n  \r\n  let oldest = projects[0]\r\n  let newest = projects[0]\r\n  \r\n  for (let i = 1; i < projects.length; i++) {\r\n    if (projects[i].updatedAt < oldest.updatedAt) oldest = projects[i]\r\n    if (projects[i].updatedAt > newest.updatedAt) newest = projects[i]\r\n  }\r\n  \r\n  return { oldest, newest }\r\n}"
+          }
+        },
+        {
+          "incorrect": {
+            "lang": "typescript",
+            "code": "function getOldestAndNewest(projects: Project[]) {\r\n  const sorted = [...projects].sort((a, b) => a.updatedAt - b.updatedAt)\r\n  return { oldest: sorted[0], newest: sorted[sorted.length - 1] }\r\n}"
+          },
+          "correct": null
+        }
+      ]
+    },
+    {
+      "skill": "react-best-practices",
+      "rule": "js-request-idle-callback",
+      "title": "Defer Non-Critical Work with requestIdleCallback",
+      "impact": "MEDIUM",
+      "tags": [
+        "javascript",
+        "performance",
+        "idle",
+        "scheduling",
+        "analytics"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "typescript",
+            "code": "function handleSearch(query: string) {\r\n  const results = searchItems(query)\r\n  setResults(results)\r\n\r\n  // These block the main thread immediately\r\n  analytics.track('search', { query })\r\n  saveToRecentSearches(query)\r\n  prefetchTopResults(results.slice(0, 3))\r\n}"
+          },
+          "correct": {
+            "lang": "typescript",
+            "code": "function handleSearch(query: string) {\r\n  const results = searchItems(query)\r\n  setResults(results)\r\n\r\n  // Defer non-critical work to idle periods\r\n  requestIdleCallback(() => {\r\n    analytics.track('search', { query })\r\n  })\r\n\r\n  requestIdleCallback(() => {\r\n    saveToRecentSearches(query)\r\n  })\r\n\r\n  requestIdleCallback(() => {\r\n    prefetchTopResults(results.slice(0, 3))\r\n  })\r\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "react-best-practices",
+      "rule": "js-set-map-lookups",
+      "title": "Use Set/Map for O(1) Lookups",
+      "impact": "LOW-MEDIUM",
+      "tags": [
+        "javascript",
+        "set",
+        "map",
+        "data-structures",
+        "performance"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "typescript",
+            "code": "const allowedIds = ['a', 'b', 'c', ...]\r\nitems.filter(item => allowedIds.includes(item.id))"
+          },
+          "correct": {
+            "lang": "typescript",
+            "code": "const allowedIds = new Set(['a', 'b', 'c', ...])\r\nitems.filter(item => allowedIds.has(item.id))"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "react-best-practices",
+      "rule": "js-tosorted-immutable",
+      "title": "Use toSorted() Instead of sort() for Immutability",
+      "impact": "MEDIUM-HIGH",
+      "tags": [
+        "javascript",
+        "arrays",
+        "immutability",
+        "react",
+        "state",
+        "mutation"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "typescript",
+            "code": "function UserList({ users }: { users: User[] }) {\r\n  // Mutates the users prop array!\r\n  const sorted = useMemo(\r\n    () => users.sort((a, b) => a.name.localeCompare(b.name)),\r\n    [users]\r\n  )\r\n  return <div>{sorted.map(renderUser)}</div>\r\n}"
+          },
+          "correct": {
+            "lang": "typescript",
+            "code": "function UserList({ users }: { users: User[] }) {\r\n  // Creates new sorted array, original unchanged\r\n  const sorted = useMemo(\r\n    () => users.toSorted((a, b) => a.name.localeCompare(b.name)),\r\n    [users]\r\n  )\r\n  return <div>{sorted.map(renderUser)}</div>\r\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "react-best-practices",
+      "rule": "rendering-animate-svg-wrapper",
+      "title": "Animate SVG Wrapper Instead of SVG Element",
+      "impact": "LOW",
+      "tags": [
+        "rendering",
+        "svg",
+        "css",
+        "animation",
+        "performance"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "tsx",
+            "code": "function LoadingSpinner() {\r\n  return (\r\n    <svg \r\n      className=\"animate-spin\"\r\n      width=\"24\" \r\n      height=\"24\" \r\n      viewBox=\"0 0 24 24\"\r\n    >\r\n      <circle cx=\"12\" cy=\"12\" r=\"10\" stroke=\"currentColor\" />\r\n    </svg>\r\n  )\r\n}"
+          },
+          "correct": {
+            "lang": "tsx",
+            "code": "function LoadingSpinner() {\r\n  return (\r\n    <div className=\"animate-spin\">\r\n      <svg \r\n        width=\"24\" \r\n        height=\"24\" \r\n        viewBox=\"0 0 24 24\"\r\n      >\r\n        <circle cx=\"12\" cy=\"12\" r=\"10\" stroke=\"currentColor\" />\r\n      </svg>\r\n    </div>\r\n  )\r\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "react-best-practices",
+      "rule": "rendering-conditional-render",
+      "title": "Use Explicit Conditional Rendering",
+      "impact": "LOW",
+      "tags": [
+        "rendering",
+        "conditional",
+        "jsx",
+        "falsy-values"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "tsx",
+            "code": "function Badge({ count }: { count: number }) {\r\n  return (\r\n    <div>\r\n      {count && <span className=\"badge\">{count}</span>}\r\n    </div>\r\n  )\r\n}\r\n\r\n// When count = 0, renders: <div>0</div>\r\n// When count = 5, renders: <div><span class=\"badge\">5</span></div>"
+          },
+          "correct": {
+            "lang": "tsx",
+            "code": "function Badge({ count }: { count: number }) {\r\n  return (\r\n    <div>\r\n      {count > 0 ? <span className=\"badge\">{count}</span> : null}\r\n    </div>\r\n  )\r\n}\r\n\r\n// When count = 0, renders: <div></div>\r\n// When count = 5, renders: <div><span class=\"badge\">5</span></div>"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "react-best-practices",
+      "rule": "rendering-hoist-jsx",
+      "title": "Hoist Static JSX Elements",
+      "impact": "LOW",
+      "tags": [
+        "rendering",
+        "jsx",
+        "static",
+        "optimization"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "tsx",
+            "code": "function LoadingSkeleton() {\r\n  return <div className=\"animate-pulse h-20 bg-gray-200\" />\r\n}\r\n\r\nfunction Container() {\r\n  return (\r\n    <div>\r\n      {loading && <LoadingSkeleton />}\r\n    </div>\r\n  )\r\n}"
+          },
+          "correct": {
+            "lang": "tsx",
+            "code": "const loadingSkeleton = (\r\n  <div className=\"animate-pulse h-20 bg-gray-200\" />\r\n)\r\n\r\nfunction Container() {\r\n  return (\r\n    <div>\r\n      {loading && loadingSkeleton}\r\n    </div>\r\n  )\r\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "react-best-practices",
+      "rule": "rendering-hydration-no-flicker",
+      "title": "Prevent Hydration Mismatch Without Flickering",
+      "impact": "MEDIUM",
+      "tags": [
+        "rendering",
+        "ssr",
+        "hydration",
+        "localStorage",
+        "flicker"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "tsx",
+            "code": "function ThemeWrapper({ children }: { children: ReactNode }) {\r\n  // localStorage is not available on server - throws error\r\n  const theme = localStorage.getItem('theme') || 'light'\r\n  \r\n  return (\r\n    <div className={theme}>\r\n      {children}\r\n    </div>\r\n  )\r\n}"
+          },
+          "correct": {
+            "lang": "tsx",
+            "code": "function ThemeWrapper({ children }: { children: ReactNode }) {\r\n  return (\r\n    <>\r\n      <div id=\"theme-wrapper\">\r\n        {children}\r\n      </div>\r\n      <script\r\n        dangerouslySetInnerHTML={{\r\n          __html: `\r\n            (function() {\r\n              try {\r\n                var theme = localStorage.getItem('theme') || 'light';\r\n                var el = document.getElementById('theme-wrapper');\r\n                if (el) el.className = theme;\r\n              } catch (e) {}\r\n            })();\r\n          `,\r\n        }}\r\n      />\r\n    </>\r\n  )\r\n}"
+          }
+        },
+        {
+          "incorrect": {
+            "lang": "tsx",
+            "code": "function ThemeWrapper({ children }: { children: ReactNode }) {\r\n  const [theme, setTheme] = useState('light')\r\n  \r\n  useEffect(() => {\r\n    // Runs after hydration - causes visible flash\r\n    const stored = localStorage.getItem('theme')\r\n    if (stored) {\r\n      setTheme(stored)\r\n    }\r\n  }, [])\r\n  \r\n  return (\r\n    <div className={theme}>\r\n      {children}\r\n    </div>\r\n  )\r\n}"
+          },
+          "correct": null
+        }
+      ]
+    },
+    {
+      "skill": "react-best-practices",
+      "rule": "rendering-hydration-suppress-warning",
+      "title": "Suppress Expected Hydration Mismatches",
+      "impact": "LOW-MEDIUM",
+      "tags": [
+        "rendering",
+        "hydration",
+        "ssr",
+        "nextjs"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "tsx",
+            "code": "function Timestamp() {\r\n  return <span>{new Date().toLocaleString()}</span>\r\n}"
+          },
+          "correct": {
+            "lang": "tsx",
+            "code": "function Timestamp() {\r\n  return (\r\n    <span suppressHydrationWarning>\r\n      {new Date().toLocaleString()}\r\n    </span>\r\n  )\r\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "react-best-practices",
+      "rule": "rendering-script-defer-async",
+      "title": "Use defer or async on Script Tags",
+      "impact": "HIGH",
+      "tags": [
+        "rendering",
+        "script",
+        "defer",
+        "async",
+        "performance"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "tsx",
+            "code": "export default function Document() {\r\n  return (\r\n    <html>\r\n      <head>\r\n        <script src=\"https://example.com/analytics.js\" />\r\n        <script src=\"/scripts/utils.js\" />\r\n      </head>\r\n      <body>{/* content */}</body>\r\n    </html>\r\n  )\r\n}"
+          },
+          "correct": {
+            "lang": "tsx",
+            "code": "export default function Document() {\r\n  return (\r\n    <html>\r\n      <head>\r\n        {/* Independent script - use async */}\r\n        <script src=\"https://example.com/analytics.js\" async />\r\n        {/* DOM-dependent script - use defer */}\r\n        <script src=\"/scripts/utils.js\" defer />\r\n      </head>\r\n      <body>{/* content */}</body>\r\n    </html>\r\n  )\r\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "react-best-practices",
+      "rule": "rendering-svg-precision",
+      "title": "Optimize SVG Precision",
+      "impact": "LOW",
+      "tags": [
+        "rendering",
+        "svg",
+        "optimization",
+        "svgo"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "svg",
+            "code": "<path d=\"M 10.293847 20.847362 L 30.938472 40.192837\" />"
+          },
+          "correct": {
+            "lang": "svg",
+            "code": "<path d=\"M 10.3 20.8 L 30.9 40.2\" />"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "react-best-practices",
+      "rule": "rendering-usetransition-loading",
+      "title": "Use useTransition Over Manual Loading States",
+      "impact": "LOW",
+      "tags": [
+        "rendering",
+        "transitions",
+        "useTransition",
+        "loading",
+        "state"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "tsx",
+            "code": "function SearchResults() {\r\n  const [query, setQuery] = useState('')\r\n  const [results, setResults] = useState([])\r\n  const [isLoading, setIsLoading] = useState(false)\r\n\r\n  const handleSearch = async (value: string) => {\r\n    setIsLoading(true)\r\n    setQuery(value)\r\n    const data = await fetchResults(value)\r\n    setResults(data)\r\n    setIsLoading(false)\r\n  }\r\n\r\n  return (\r\n    <>\r\n      <input onChange={(e) => handleSearch(e.target.value)} />\r\n      {isLoading && <Spinner />}\r\n      <ResultsList results={results} />\r\n    </>\r\n  )\r\n}"
+          },
+          "correct": {
+            "lang": "tsx",
+            "code": "import { useTransition, useState } from 'react'\r\n\r\nfunction SearchResults() {\r\n  const [query, setQuery] = useState('')\r\n  const [results, setResults] = useState([])\r\n  const [isPending, startTransition] = useTransition()\r\n\r\n  const handleSearch = (value: string) => {\r\n    setQuery(value) // Update input immediately\r\n    \r\n    startTransition(async () => {\r\n      // Fetch and update results\r\n      const data = await fetchResults(value)\r\n      setResults(data)\r\n    })\r\n  }\r\n\r\n  return (\r\n    <>\r\n      <input onChange={(e) => handleSearch(e.target.value)} />\r\n      {isPending && <Spinner />}\r\n      <ResultsList results={results} />\r\n    </>\r\n  )\r\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "react-best-practices",
+      "rule": "rerender-defer-reads",
+      "title": "Defer State Reads to Usage Point",
+      "impact": "MEDIUM",
+      "tags": [
+        "rerender",
+        "searchParams",
+        "localStorage",
+        "optimization"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "tsx",
+            "code": "function ShareButton({ chatId }: { chatId: string }) {\r\n  const searchParams = useSearchParams()\r\n\r\n  const handleShare = () => {\r\n    const ref = searchParams.get('ref')\r\n    shareChat(chatId, { ref })\r\n  }\r\n\r\n  return <button onClick={handleShare}>Share</button>\r\n}"
+          },
+          "correct": {
+            "lang": "tsx",
+            "code": "function ShareButton({ chatId }: { chatId: string }) {\r\n  const handleShare = () => {\r\n    const params = new URLSearchParams(window.location.search)\r\n    const ref = params.get('ref')\r\n    shareChat(chatId, { ref })\r\n  }\r\n\r\n  return <button onClick={handleShare}>Share</button>\r\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "react-best-practices",
+      "rule": "rerender-dependencies",
+      "title": "Narrow Effect Dependencies",
+      "impact": "LOW",
+      "tags": [
+        "rerender",
+        "useEffect",
+        "dependencies",
+        "optimization"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "tsx",
+            "code": "useEffect(() => {\r\n  console.log(user.id)\r\n}, [user])"
+          },
+          "correct": {
+            "lang": "tsx",
+            "code": "useEffect(() => {\r\n  console.log(user.id)\r\n}, [user.id])"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "react-best-practices",
+      "rule": "rerender-derived-state-no-effect",
+      "title": "Calculate Derived State During Rendering",
+      "impact": "MEDIUM",
+      "tags": [
+        "rerender",
+        "derived-state",
+        "useEffect",
+        "state"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "tsx",
+            "code": "function Form() {\r\n  const [firstName, setFirstName] = useState('First')\r\n  const [lastName, setLastName] = useState('Last')\r\n  const [fullName, setFullName] = useState('')\r\n\r\n  useEffect(() => {\r\n    setFullName(firstName + ' ' + lastName)\r\n  }, [firstName, lastName])\r\n\r\n  return <p>{fullName}</p>\r\n}"
+          },
+          "correct": {
+            "lang": "tsx",
+            "code": "function Form() {\r\n  const [firstName, setFirstName] = useState('First')\r\n  const [lastName, setLastName] = useState('Last')\r\n  const fullName = firstName + ' ' + lastName\r\n\r\n  return <p>{fullName}</p>\r\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "react-best-practices",
+      "rule": "rerender-derived-state",
+      "title": "Subscribe to Derived State",
+      "impact": "MEDIUM",
+      "tags": [
+        "rerender",
+        "derived-state",
+        "media-query",
+        "optimization"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "tsx",
+            "code": "function Sidebar() {\r\n  const width = useWindowWidth()  // updates continuously\r\n  const isMobile = width < 768\r\n  return <nav className={isMobile ? 'mobile' : 'desktop'} />\r\n}"
+          },
+          "correct": {
+            "lang": "tsx",
+            "code": "function Sidebar() {\r\n  const isMobile = useMediaQuery('(max-width: 767px)')\r\n  return <nav className={isMobile ? 'mobile' : 'desktop'} />\r\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "react-best-practices",
+      "rule": "rerender-functional-setstate",
+      "title": "Use Functional setState Updates",
+      "impact": "MEDIUM",
+      "tags": [
+        "react",
+        "hooks",
+        "useState",
+        "useCallback",
+        "callbacks",
+        "closures"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "tsx",
+            "code": "function TodoList() {\r\n  const [items, setItems] = useState(initialItems)\r\n  \r\n  // Callback must depend on items, recreated on every items change\r\n  const addItems = useCallback((newItems: Item[]) => {\r\n    setItems([...items, ...newItems])\r\n  }, [items])  // ❌ items dependency causes recreations\r\n  \r\n  // Risk of stale closure if dependency is forgotten\r\n  const removeItem = useCallback((id: string) => {\r\n    setItems(items.filter(item => item.id !== id))\r\n  }, [])  // ❌ Missing items dependency - will use stale items!\r\n  \r\n  return <ItemsEditor items={items} onAdd={addItems} onRemove={removeItem} />\r\n}"
+          },
+          "correct": {
+            "lang": "tsx",
+            "code": "function TodoList() {\r\n  const [items, setItems] = useState(initialItems)\r\n  \r\n  // Stable callback, never recreated\r\n  const addItems = useCallback((newItems: Item[]) => {\r\n    setItems(curr => [...curr, ...newItems])\r\n  }, [])  // ✅ No dependencies needed\r\n  \r\n  // Always uses latest state, no stale closure risk\r\n  const removeItem = useCallback((id: string) => {\r\n    setItems(curr => curr.filter(item => item.id !== id))\r\n  }, [])  // ✅ Safe and stable\r\n  \r\n  return <ItemsEditor items={items} onAdd={addItems} onRemove={removeItem} />\r\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "react-best-practices",
+      "rule": "rerender-lazy-state-init",
+      "title": "Use Lazy State Initialization",
+      "impact": "MEDIUM",
+      "tags": [
+        "react",
+        "hooks",
+        "useState",
+        "performance",
+        "initialization"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "tsx",
+            "code": "function FilteredList({ items }: { items: Item[] }) {\r\n  // buildSearchIndex() runs on EVERY render, even after initialization\r\n  const [searchIndex, setSearchIndex] = useState(buildSearchIndex(items))\r\n  const [query, setQuery] = useState('')\r\n  \r\n  // When query changes, buildSearchIndex runs again unnecessarily\r\n  return <SearchResults index={searchIndex} query={query} />\r\n}\r\n\r\nfunction UserProfile() {\r\n  // JSON.parse runs on every render\r\n  const [settings, setSettings] = useState(\r\n    JSON.parse(localStorage.getItem('settings') || '{}')\r\n  )\r\n  \r\n  return <SettingsForm settings={settings} onChange={setSettings} />\r\n}"
+          },
+          "correct": {
+            "lang": "tsx",
+            "code": "function FilteredList({ items }: { items: Item[] }) {\r\n  // buildSearchIndex() runs ONLY on initial render\r\n  const [searchIndex, setSearchIndex] = useState(() => buildSearchIndex(items))\r\n  const [query, setQuery] = useState('')\r\n  \r\n  return <SearchResults index={searchIndex} query={query} />\r\n}\r\n\r\nfunction UserProfile() {\r\n  // JSON.parse runs only on initial render\r\n  const [settings, setSettings] = useState(() => {\r\n    const stored = localStorage.getItem('settings')\r\n    return stored ? JSON.parse(stored) : {}\r\n  })\r\n  \r\n  return <SettingsForm settings={settings} onChange={setSettings} />\r\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "react-best-practices",
+      "rule": "rerender-memo-with-default-value",
+      "title": "Extract Default Non-primitive Parameter Value from Memoized Component to Constant",
+      "impact": "MEDIUM",
+      "tags": [
+        "rerender",
+        "memo",
+        "optimization"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "tsx",
+            "code": "const UserAvatar = memo(function UserAvatar({ onClick = () => {} }: { onClick?: () => void }) {\r\n  // ...\r\n})\r\n\r\n// Used without optional onClick\r\n<UserAvatar />"
+          },
+          "correct": {
+            "lang": "tsx",
+            "code": "const NOOP = () => {};\r\n\r\nconst UserAvatar = memo(function UserAvatar({ onClick = NOOP }: { onClick?: () => void }) {\r\n  // ...\r\n})\r\n\r\n// Used without optional onClick\r\n<UserAvatar />"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "react-best-practices",
+      "rule": "rerender-memo",
+      "title": "Extract to Memoized Components",
+      "impact": "MEDIUM",
+      "tags": [
+        "rerender",
+        "memo",
+        "useMemo",
+        "optimization"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "tsx",
+            "code": "function Profile({ user, loading }: Props) {\r\n  const avatar = useMemo(() => {\r\n    const id = computeAvatarId(user)\r\n    return <Avatar id={id} />\r\n  }, [user])\r\n\r\n  if (loading) return <Skeleton />\r\n  return <div>{avatar}</div>\r\n}"
+          },
+          "correct": {
+            "lang": "tsx",
+            "code": "const UserAvatar = memo(function UserAvatar({ user }: { user: User }) {\r\n  const id = useMemo(() => computeAvatarId(user), [user])\r\n  return <Avatar id={id} />\r\n})\r\n\r\nfunction Profile({ user, loading }: Props) {\r\n  if (loading) return <Skeleton />\r\n  return (\r\n    <div>\r\n      <UserAvatar user={user} />\r\n    </div>\r\n  )\r\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "react-best-practices",
+      "rule": "rerender-move-effect-to-event",
+      "title": "Put Interaction Logic in Event Handlers",
+      "impact": "MEDIUM",
+      "tags": [
+        "rerender",
+        "useEffect",
+        "events",
+        "side-effects",
+        "dependencies"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "tsx",
+            "code": "function Form() {\r\n  const [submitted, setSubmitted] = useState(false)\r\n  const theme = useContext(ThemeContext)\r\n\r\n  useEffect(() => {\r\n    if (submitted) {\r\n      post('/api/register')\r\n      showToast('Registered', theme)\r\n    }\r\n  }, [submitted, theme])\r\n\r\n  return <button onClick={() => setSubmitted(true)}>Submit</button>\r\n}"
+          },
+          "correct": {
+            "lang": "tsx",
+            "code": "function Form() {\r\n  const theme = useContext(ThemeContext)\r\n\r\n  function handleSubmit() {\r\n    post('/api/register')\r\n    showToast('Registered', theme)\r\n  }\r\n\r\n  return <button onClick={handleSubmit}>Submit</button>\r\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "react-best-practices",
+      "rule": "rerender-no-inline-components",
+      "title": "Don't Define Components Inside Components",
+      "impact": "HIGH",
+      "tags": [
+        "rerender",
+        "components",
+        "remount",
+        "performance"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "tsx",
+            "code": "function UserProfile({ user, theme }) {\r\n  // Defined inside to access `theme` - BAD\r\n  const Avatar = () => (\r\n    <img\r\n      src={user.avatarUrl}\r\n      className={theme === 'dark' ? 'avatar-dark' : 'avatar-light'}\r\n    />\r\n  )\r\n\r\n  // Defined inside to access `user` - BAD\r\n  const Stats = () => (\r\n    <div>\r\n      <span>{user.followers} followers</span>\r\n      <span>{user.posts} posts</span>\r\n    </div>\r\n  )\r\n\r\n  return (\r\n    <div>\r\n      <Avatar />\r\n      <Stats />\r\n    </div>\r\n  )\r\n}"
+          },
+          "correct": {
+            "lang": "tsx",
+            "code": "function Avatar({ src, theme }: { src: string; theme: string }) {\r\n  return (\r\n    <img\r\n      src={src}\r\n      className={theme === 'dark' ? 'avatar-dark' : 'avatar-light'}\r\n    />\r\n  )\r\n}\r\n\r\nfunction Stats({ followers, posts }: { followers: number; posts: number }) {\r\n  return (\r\n    <div>\r\n      <span>{followers} followers</span>\r\n      <span>{posts} posts</span>\r\n    </div>\r\n  )\r\n}\r\n\r\nfunction UserProfile({ user, theme }) {\r\n  return (\r\n    <div>\r\n      <Avatar src={user.avatarUrl} theme={theme} />\r\n      <Stats followers={user.followers} posts={user.posts} />\r\n    </div>\r\n  )\r\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "react-best-practices",
+      "rule": "rerender-simple-expression-in-memo",
+      "title": "Do not wrap a simple expression with a primitive result type in useMemo",
+      "impact": "LOW-MEDIUM",
+      "tags": [
+        "rerender",
+        "useMemo",
+        "optimization"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "tsx",
+            "code": "function Header({ user, notifications }: Props) {\r\n  const isLoading = useMemo(() => {\r\n    return user.isLoading || notifications.isLoading\r\n  }, [user.isLoading, notifications.isLoading])\r\n\r\n  if (isLoading) return <Skeleton />\r\n  // return some markup\r\n}"
+          },
+          "correct": {
+            "lang": "tsx",
+            "code": "function Header({ user, notifications }: Props) {\r\n  const isLoading = user.isLoading || notifications.isLoading\r\n\r\n  if (isLoading) return <Skeleton />\r\n  // return some markup\r\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "react-best-practices",
+      "rule": "rerender-split-combined-hooks",
+      "title": "Split Combined Hook Computations",
+      "impact": "MEDIUM",
+      "tags": [
+        "rerender",
+        "useMemo",
+        "useEffect",
+        "dependencies",
+        "optimization"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "tsx",
+            "code": "const sortedProducts = useMemo(() => {\r\n  const filtered = products.filter((p) => p.category === category)\r\n  const sorted = filtered.toSorted((a, b) =>\r\n    sortOrder === \"asc\" ? a.price - b.price : b.price - a.price\r\n  )\r\n  return sorted\r\n}, [products, category, sortOrder])"
+          },
+          "correct": {
+            "lang": "tsx",
+            "code": "const filteredProducts = useMemo(\r\n  () => products.filter((p) => p.category === category),\r\n  [products, category]\r\n)\r\n\r\nconst sortedProducts = useMemo(\r\n  () =>\r\n    filteredProducts.toSorted((a, b) =>\r\n      sortOrder === \"asc\" ? a.price - b.price : b.price - a.price\r\n    ),\r\n  [filteredProducts, sortOrder]\r\n)"
+          }
+        },
+        {
+          "incorrect": {
+            "lang": "tsx",
+            "code": "useEffect(() => {\r\n  analytics.trackPageView(pathname)\r\n  document.title = `${pageTitle} | My App`\r\n}, [pathname, pageTitle])"
+          },
+          "correct": {
+            "lang": "tsx",
+            "code": "useEffect(() => {\r\n  analytics.trackPageView(pathname)\r\n}, [pathname])\r\n\r\nuseEffect(() => {\r\n  document.title = `${pageTitle} | My App`\r\n}, [pageTitle])"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "react-best-practices",
+      "rule": "rerender-transitions",
+      "title": "Use Transitions for Non-Urgent Updates",
+      "impact": "MEDIUM",
+      "tags": [
+        "rerender",
+        "transitions",
+        "startTransition",
+        "performance"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "tsx",
+            "code": "function ScrollTracker() {\r\n  const [scrollY, setScrollY] = useState(0)\r\n  useEffect(() => {\r\n    const handler = () => setScrollY(window.scrollY)\r\n    window.addEventListener('scroll', handler, { passive: true })\r\n    return () => window.removeEventListener('scroll', handler)\r\n  }, [])\r\n}"
+          },
+          "correct": {
+            "lang": "tsx",
+            "code": "import { startTransition } from 'react'\r\n\r\nfunction ScrollTracker() {\r\n  const [scrollY, setScrollY] = useState(0)\r\n  useEffect(() => {\r\n    const handler = () => {\r\n      startTransition(() => setScrollY(window.scrollY))\r\n    }\r\n    window.addEventListener('scroll', handler, { passive: true })\r\n    return () => window.removeEventListener('scroll', handler)\r\n  }, [])\r\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "react-best-practices",
+      "rule": "rerender-use-deferred-value",
+      "title": "Use useDeferredValue for Expensive Derived Renders",
+      "impact": "MEDIUM",
+      "tags": [
+        "rerender",
+        "useDeferredValue",
+        "optimization",
+        "concurrent"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "tsx",
+            "code": "function Search({ items }: { items: Item[] }) {\r\n  const [query, setQuery] = useState('')\r\n  const filtered = items.filter(item => fuzzyMatch(item, query))\r\n\r\n  return (\r\n    <>\r\n      <input value={query} onChange={e => setQuery(e.target.value)} />\r\n      <ResultsList results={filtered} />\r\n    </>\r\n  )\r\n}"
+          },
+          "correct": {
+            "lang": "tsx",
+            "code": "function Search({ items }: { items: Item[] }) {\r\n  const [query, setQuery] = useState('')\r\n  const deferredQuery = useDeferredValue(query)\r\n  const filtered = useMemo(\r\n    () => items.filter(item => fuzzyMatch(item, deferredQuery)),\r\n    [items, deferredQuery]\r\n  )\r\n  const isStale = query !== deferredQuery\r\n\r\n  return (\r\n    <>\r\n      <input value={query} onChange={e => setQuery(e.target.value)} />\r\n      <div style={{ opacity: isStale ? 0.7 : 1 }}>\r\n        <ResultsList results={filtered} />\r\n      </div>\r\n    </>\r\n  )\r\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "react-best-practices",
+      "rule": "rerender-use-ref-transient-values",
+      "title": "Use useRef for Transient Values",
+      "impact": "MEDIUM",
+      "tags": [
+        "rerender",
+        "useref",
+        "state",
+        "performance"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "tsx",
+            "code": "function Tracker() {\r\n  const [lastX, setLastX] = useState(0)\r\n\r\n  useEffect(() => {\r\n    const onMove = (e: MouseEvent) => setLastX(e.clientX)\r\n    window.addEventListener('mousemove', onMove)\r\n    return () => window.removeEventListener('mousemove', onMove)\r\n  }, [])\r\n\r\n  return (\r\n    <div\r\n      style={{\r\n        position: 'fixed',\r\n        top: 0,\r\n        left: lastX,\r\n        width: 8,\r\n        height: 8,\r\n        background: 'black',\r\n      }}\r\n    />\r\n  )\r\n}"
+          },
+          "correct": {
+            "lang": "tsx",
+            "code": "function Tracker() {\r\n  const lastXRef = useRef(0)\r\n  const dotRef = useRef<HTMLDivElement>(null)\r\n\r\n  useEffect(() => {\r\n    const onMove = (e: MouseEvent) => {\r\n      lastXRef.current = e.clientX\r\n      const node = dotRef.current\r\n      if (node) {\r\n        node.style.transform = `translateX(${e.clientX}px)`\r\n      }\r\n    }\r\n    window.addEventListener('mousemove', onMove)\r\n    return () => window.removeEventListener('mousemove', onMove)\r\n  }, [])\r\n\r\n  return (\r\n    <div\r\n      ref={dotRef}\r\n      style={{\r\n        position: 'fixed',\r\n        top: 0,\r\n        left: 0,\r\n        width: 8,\r\n        height: 8,\r\n        background: 'black',\r\n        transform: 'translateX(0px)',\r\n      }}\r\n    />\r\n  )\r\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "react-best-practices",
+      "rule": "server-after-nonblocking",
+      "title": "Use after() for Non-Blocking Operations",
+      "impact": "MEDIUM",
+      "tags": [
+        "server",
+        "async",
+        "logging",
+        "analytics",
+        "side-effects"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "tsx",
+            "code": "import { logUserAction } from '@/app/utils'\r\n\r\nexport async function POST(request: Request) {\r\n  // Perform mutation\r\n  await updateDatabase(request)\r\n  \r\n  // Logging blocks the response\r\n  const userAgent = request.headers.get('user-agent') || 'unknown'\r\n  await logUserAction({ userAgent })\r\n  \r\n  return new Response(JSON.stringify({ status: 'success' }), {\r\n    status: 200,\r\n    headers: { 'Content-Type': 'application/json' }\r\n  })\r\n}"
+          },
+          "correct": {
+            "lang": "tsx",
+            "code": "import { after } from 'next/server'\r\nimport { headers, cookies } from 'next/headers'\r\nimport { logUserAction } from '@/app/utils'\r\n\r\nexport async function POST(request: Request) {\r\n  // Perform mutation\r\n  await updateDatabase(request)\r\n  \r\n  // Log after response is sent\r\n  after(async () => {\r\n    const userAgent = (await headers()).get('user-agent') || 'unknown'\r\n    const sessionCookie = (await cookies()).get('session-id')?.value || 'anonymous'\r\n    \r\n    logUserAction({ sessionCookie, userAgent })\r\n  })\r\n  \r\n  return new Response(JSON.stringify({ status: 'success' }), {\r\n    status: 200,\r\n    headers: { 'Content-Type': 'application/json' }\r\n  })\r\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "react-best-practices",
+      "rule": "server-auth-actions",
+      "title": "Authenticate Server Actions Like API Routes",
+      "impact": "CRITICAL",
+      "tags": [
+        "server",
+        "server-actions",
+        "authentication",
+        "security",
+        "authorization"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "typescript",
+            "code": "'use server'\r\n\r\nexport async function deleteUser(userId: string) {\r\n  // Anyone can call this! No auth check\r\n  await db.user.delete({ where: { id: userId } })\r\n  return { success: true }\r\n}"
+          },
+          "correct": {
+            "lang": "typescript",
+            "code": "'use server'\r\n\r\nimport { verifySession } from '@/lib/auth'\r\nimport { unauthorized } from '@/lib/errors'\r\n\r\nexport async function deleteUser(userId: string) {\r\n  // Always check auth inside the action\r\n  const session = await verifySession()\r\n  \r\n  if (!session) {\r\n    throw unauthorized('Must be logged in')\r\n  }\r\n  \r\n  // Check authorization too\r\n  if (session.user.role !== 'admin' && session.user.id !== userId) {\r\n    throw unauthorized('Cannot delete other users')\r\n  }\r\n  \r\n  await db.user.delete({ where: { id: userId } })\r\n  return { success: true }\r\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "react-best-practices",
+      "rule": "server-cache-react",
+      "title": "Per-Request Deduplication with React.cache()",
+      "impact": "MEDIUM",
+      "tags": [
+        "server",
+        "cache",
+        "react-cache",
+        "deduplication"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "typescript",
+            "code": "const getUser = cache(async (params: { uid: number }) => {\r\n  return await db.user.findUnique({ where: { id: params.uid } })\r\n})\r\n\r\n// Each call creates new object, never hits cache\r\ngetUser({ uid: 1 })\r\ngetUser({ uid: 1 })  // Cache miss, runs query again"
+          },
+          "correct": {
+            "lang": "typescript",
+            "code": "const getUser = cache(async (uid: number) => {\r\n  return await db.user.findUnique({ where: { id: uid } })\r\n})\r\n\r\n// Primitive args use value equality\r\ngetUser(1)\r\ngetUser(1)  // Cache hit, returns cached result"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "react-best-practices",
+      "rule": "server-dedup-props",
+      "title": "Avoid Duplicate Serialization in RSC Props",
+      "impact": "LOW",
+      "tags": [
+        "server",
+        "rsc",
+        "serialization",
+        "props",
+        "client-components"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "tsx",
+            "code": "// RSC: sends 6 strings (2 arrays × 3 items)\r\n<ClientList usernames={usernames} usernamesOrdered={usernames.toSorted()} />"
+          },
+          "correct": {
+            "lang": "tsx",
+            "code": "// RSC: send once\r\n<ClientList usernames={usernames} />\r\n\r\n// Client: transform there\r\n'use client'\r\nconst sorted = useMemo(() => [...usernames].sort(), [usernames])"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "react-best-practices",
+      "rule": "server-hoist-static-io",
+      "title": "Hoist Static I/O to Module Level",
+      "impact": "HIGH",
+      "tags": [
+        "server",
+        "io",
+        "performance",
+        "next.js",
+        "route-handlers",
+        "og-image"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "typescript",
+            "code": "// app/api/og/route.tsx\r\nimport { ImageResponse } from 'next/og'\r\n\r\nexport async function GET(request: Request) {\r\n  // Runs on EVERY request - expensive!\r\n  const fontData = await fetch(\r\n    new URL('./fonts/Inter.ttf', import.meta.url)\r\n  ).then(res => res.arrayBuffer())\r\n\r\n  const logoData = await fetch(\r\n    new URL('./images/logo.png', import.meta.url)\r\n  ).then(res => res.arrayBuffer())\r\n\r\n  return new ImageResponse(\r\n    <div style={{ fontFamily: 'Inter' }}>\r\n      <img src={logoData} />\r\n      Hello World\r\n    </div>,\r\n    { fonts: [{ name: 'Inter', data: fontData }] }\r\n  )\r\n}"
+          },
+          "correct": {
+            "lang": "typescript",
+            "code": "// app/api/og/route.tsx\r\nimport { ImageResponse } from 'next/og'\r\n\r\n// Module-level: runs ONCE when module is first imported\r\nconst fontData = fetch(\r\n  new URL('./fonts/Inter.ttf', import.meta.url)\r\n).then(res => res.arrayBuffer())\r\n\r\nconst logoData = fetch(\r\n  new URL('./images/logo.png', import.meta.url)\r\n).then(res => res.arrayBuffer())\r\n\r\nexport async function GET(request: Request) {\r\n  // Await the already-started promises\r\n  const [font, logo] = await Promise.all([fontData, logoData])\r\n\r\n  return new ImageResponse(\r\n    <div style={{ fontFamily: 'Inter' }}>\r\n      <img src={logo} />\r\n      Hello World\r\n    </div>,\r\n    { fonts: [{ name: 'Inter', data: font }] }\r\n  )\r\n}"
+          }
+        },
+        {
+          "incorrect": {
+            "lang": "typescript",
+            "code": "import fs from 'node:fs/promises'\r\n\r\nexport async function processRequest(data: Data) {\r\n  const config = JSON.parse(\r\n    await fs.readFile('./config.json', 'utf-8')\r\n  )\r\n  const template = await fs.readFile('./template.html', 'utf-8')\r\n\r\n  return render(template, data, config)\r\n}"
+          },
+          "correct": {
+            "lang": "typescript",
+            "code": "// app/api/og/route.tsx\r\nimport { ImageResponse } from 'next/og'\r\nimport { readFileSync } from 'fs'\r\nimport { join } from 'path'\r\n\r\n// Synchronous read at module level - blocks only during module init\r\nconst fontData = readFileSync(\r\n  join(process.cwd(), 'public/fonts/Inter.ttf')\r\n)\r\n\r\nconst logoData = readFileSync(\r\n  join(process.cwd(), 'public/images/logo.png')\r\n)\r\n\r\nexport async function GET(request: Request) {\r\n  return new ImageResponse(\r\n    <div style={{ fontFamily: 'Inter' }}>\r\n      <img src={logoData} />\r\n      Hello World\r\n    </div>,\r\n    { fonts: [{ name: 'Inter', data: fontData }] }\r\n  )\r\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "react-best-practices",
+      "rule": "server-no-shared-module-state",
+      "title": "Avoid Shared Module State for Request Data",
+      "impact": "HIGH",
+      "tags": [
+        "server",
+        "rsc",
+        "ssr",
+        "concurrency",
+        "security",
+        "state"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "tsx",
+            "code": "let currentUser: User | null = null\r\n\r\nexport default async function Page() {\r\n  currentUser = await auth()\r\n  return <Dashboard />\r\n}\r\n\r\nasync function Dashboard() {\r\n  return <div>{currentUser?.name}</div>\r\n}"
+          },
+          "correct": {
+            "lang": "tsx",
+            "code": "export default async function Page() {\r\n  const user = await auth()\r\n  return <Dashboard user={user} />\r\n}\r\n\r\nfunction Dashboard({ user }: { user: User | null }) {\r\n  return <div>{user?.name}</div>\r\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "react-best-practices",
+      "rule": "server-parallel-fetching",
+      "title": "Parallel Data Fetching with Component Composition",
+      "impact": "CRITICAL",
+      "tags": [
+        "server",
+        "rsc",
+        "parallel-fetching",
+        "composition"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "tsx",
+            "code": "export default async function Page() {\r\n  const header = await fetchHeader()\r\n  return (\r\n    <div>\r\n      <div>{header}</div>\r\n      <Sidebar />\r\n    </div>\r\n  )\r\n}\r\n\r\nasync function Sidebar() {\r\n  const items = await fetchSidebarItems()\r\n  return <nav>{items.map(renderItem)}</nav>\r\n}"
+          },
+          "correct": {
+            "lang": "tsx",
+            "code": "async function Header() {\r\n  const data = await fetchHeader()\r\n  return <div>{data}</div>\r\n}\r\n\r\nasync function Sidebar() {\r\n  const items = await fetchSidebarItems()\r\n  return <nav>{items.map(renderItem)}</nav>\r\n}\r\n\r\nexport default function Page() {\r\n  return (\r\n    <div>\r\n      <Header />\r\n      <Sidebar />\r\n    </div>\r\n  )\r\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "react-best-practices",
+      "rule": "server-parallel-nested-fetching",
+      "title": "Parallel Nested Data Fetching",
+      "impact": "CRITICAL",
+      "tags": [
+        "server",
+        "rsc",
+        "parallel-fetching",
+        "promise-chaining"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "tsx",
+            "code": "const chats = await Promise.all(\r\n  chatIds.map(id => getChat(id))\r\n)\r\n\r\nconst chatAuthors = await Promise.all(\r\n  chats.map(chat => getUser(chat.author))\r\n)"
+          },
+          "correct": {
+            "lang": "tsx",
+            "code": "const chatAuthors = await Promise.all(\r\n  chatIds.map(id => getChat(id).then(chat => getUser(chat.author)))\r\n)"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "react-best-practices",
+      "rule": "server-serialization",
+      "title": "Minimize Serialization at RSC Boundaries",
+      "impact": "HIGH",
+      "tags": [
+        "server",
+        "rsc",
+        "serialization",
+        "props"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "tsx",
+            "code": "async function Page() {\r\n  const user = await fetchUser()  // 50 fields\r\n  return <Profile user={user} />\r\n}\r\n\r\n'use client'\r\nfunction Profile({ user }: { user: User }) {\r\n  return <div>{user.name}</div>  // uses 1 field\r\n}"
+          },
+          "correct": {
+            "lang": "tsx",
+            "code": "async function Page() {\r\n  const user = await fetchUser()\r\n  return <Profile name={user.name} />\r\n}\r\n\r\n'use client'\r\nfunction Profile({ name }: { name: string }) {\r\n  return <div>{name}</div>\r\n}"
+          }
+        }
+      ]
+    }
+  ]
+}

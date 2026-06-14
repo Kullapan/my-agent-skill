@@ -1,0 +1,139 @@
+{
+  "generated": "2026-06-14T07:05:17.952Z",
+  "skill": "java-restful-best-practices",
+  "total": 5,
+  "testCases": [
+    {
+      "skill": "java-restful-best-practices",
+      "rule": "arch-controller-advice",
+      "title": "Centralize exception handling with @RestControllerAdvice",
+      "impact": "HIGH",
+      "tags": [
+        "java",
+        "spring-boot",
+        "mvc",
+        "error-handling",
+        "controller-advice",
+        "exception-handler"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "java",
+            "code": "// ❌ Repetitive and inconsistent error handling\n@GetMapping(\"/{id}\")\npublic ResponseEntity<?> getUser(@PathVariable Long id) {\n    try {\n        UserResponse user = userService.findById(id);\n        return ResponseEntity.ok(user);\n    } catch (NotFoundException e) {\n        return ResponseEntity.status(404).body(Map.of(\"error\", \"Not Found\"));\n    } catch (Exception e) {\n        // 🚨 Potentially leaks internal exception messages\n        return ResponseEntity.status(500).body(e.getMessage());\n    }\n}"
+          },
+          "correct": {
+            "lang": "java",
+            "code": "import org.springframework.http.HttpStatus;\nimport org.springframework.web.bind.annotation.ExceptionHandler;\nimport org.springframework.web.bind.annotation.ResponseStatus;\nimport org.springframework.web.bind.annotation.RestControllerAdvice;\n\nimport java.time.Instant;\n\n// ✅ Define a standard error schema as a Record\npublic record ApiError(int status, String message, Instant timestamp) {}\n\n// ✅ Centralized Handler\n@RestControllerAdvice\npublic class GlobalExceptionHandler {\n\n    @ExceptionHandler(NotFoundException.class)\n    @ResponseStatus(HttpStatus.NOT_FOUND)\n    public ApiError handleNotFound(NotFoundException ex) {\n        return new ApiError(404, ex.getMessage(), Instant.now());\n    }\n\n    // Fallback for unexpected server errors\n    @ExceptionHandler(Exception.class)\n    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)\n    public ApiError handleGenericException(Exception ex) {\n        // Log the actual exception for developers\n        // logger.error(\"Unhandled exception\", ex);\n        \n        // Return a generic, safe message to the client\n        return new ApiError(500, \"An unexpected error occurred\", Instant.now());\n    }\n}\n\n@RestController\n@RequestMapping(\"/users\")\npublic class UserController {\n\n    private final UserService userService;\n    // constructor omitted\n\n    // ✅ Clean controller, focuses only on the happy path\n    @GetMapping(\"/{id}\")\n    public UserResponse getUser(@PathVariable Long id) {\n        return userService.findById(id);\n    }\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "java-restful-best-practices",
+      "rule": "arch-dto-records",
+      "title": "Use Java Records for immutable DTOs",
+      "impact": "HIGH",
+      "tags": [
+        "java",
+        "records",
+        "dtos",
+        "spring-boot",
+        "api"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "java",
+            "code": "// ❌ Boilerplate-heavy and mutable\npublic class UserRequest {\n    private String email;\n    private String name;\n\n    public UserRequest() {}\n\n    public UserRequest(String email, String name) {\n        this.email = email;\n        this.name = name;\n    }\n\n    public String getEmail() { return email; }\n    public void setEmail(String email) { this.email = email; }\n    public String getName() { return name; }\n    public void setName(String name) { this.name = name; }\n}"
+          },
+          "correct": {
+            "lang": "java",
+            "code": "import jakarta.validation.constraints.Email;\nimport jakarta.validation.constraints.NotBlank;\n\n// ✅ Concise, immutable, and supports validation annotations\npublic record UserRequest(\n    @NotBlank(message = \"Email is required\")\n    @Email(message = \"Invalid email\")\n    String email,\n    \n    String name\n) {}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "java-restful-best-practices",
+      "rule": "data-entity-exposure",
+      "title": "Prevent entity exposure using DTO mapping",
+      "impact": "CRITICAL",
+      "tags": [
+        "java",
+        "rest",
+        "api",
+        "dtos",
+        "mapping",
+        "security",
+        "jpa",
+        "entities"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "java",
+            "code": "// ❌ Entity used directly in API request and response\n@Entity\n@Table(name = \"users\")\npublic class User {\n    @Id @GeneratedValue private Long id;\n    private String username;\n    private String passwordHash; // 🚨 Leaked in response!\n    private boolean isAdmin = false;\n    // getters and setters\n}\n\n@RestController\n@RequestMapping(\"/users\")\npublic class UserController {\n    private final UserRepository userRepository;\n\n    @PostMapping\n    public User createUser(@RequestBody User user) {\n        // 🚨 Mass assignment: User can send {\"isAdmin\": true}\n        return userRepository.save(user);\n    }\n\n    @GetMapping(\"/{id}\")\n    public User getUser(@PathVariable Long id) {\n        // 🚨 Leaks passwordHash\n        return userRepository.findById(id).orElseThrow();\n    }\n}"
+          },
+          "correct": {
+            "lang": "java",
+            "code": "// ✅ Distinct DTOs\npublic record UserCreateRequest(String username, String plaintextPassword) {}\npublic record UserResponse(Long id, String username) {\n    // ✅ Static factory method for mapping\n    public static UserResponse fromEntity(User user) {\n        return new UserResponse(user.getId(), user.getUsername());\n    }\n}\n\n@RestController\n@RequestMapping(\"/users\")\npublic class UserController {\n    \n    private final UserRepository userRepository;\n    private final PasswordEncoder passwordEncoder;\n\n    @PostMapping\n    public UserResponse createUser(@RequestBody UserCreateRequest request) {\n        User user = new User();\n        user.setUsername(request.username());\n        user.setPasswordHash(passwordEncoder.encode(request.plaintextPassword()));\n        user.setAdmin(false); // Safe: controlled by server\n\n        User savedUser = userRepository.save(user);\n        return UserResponse.fromEntity(savedUser);\n    }\n\n    @GetMapping(\"/{id}\")\n    public UserResponse getUser(@PathVariable Long id) {\n        User user = userRepository.findById(id)\n            .orElseThrow(() -> new NotFoundException(\"User not found\"));\n        return UserResponse.fromEntity(user); // ✅ Safe response\n    }\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "java-restful-best-practices",
+      "rule": "rest-pagination",
+      "title": "Implement proper pagination for collection endpoints",
+      "impact": "HIGH",
+      "tags": [
+        "rest",
+        "api",
+        "java",
+        "spring-boot",
+        "pagination",
+        "jpa",
+        "collections"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "java",
+            "code": "// ❌ No pagination - dangerous for large datasets!\n@GetMapping\npublic List<UserResponse> getAllUsers() {\n    return userRepository.findAll().stream()\n        .map(UserResponse::fromEntity)\n        .toList();\n}"
+          },
+          "correct": {
+            "lang": "java",
+            "code": "import org.springframework.data.domain.Page;\nimport org.springframework.data.domain.Pageable;\nimport org.springframework.data.web.PageableDefault;\n\n// ...\n\n// ✅ Using Pageable and Page<T>\n@GetMapping\npublic Page<UserResponse> getUsers(\n    // ✅ Set safe defaults\n    @PageableDefault(size = 20, sort = \"createdAt\") Pageable pageable \n) {\n    // userRepository.findAll(Pageable) returns a Page<User>\n    Page<User> userPage = userRepository.findAll(pageable);\n    \n    // Page<T>.map() easily converts entities to DTOs while preserving pagination metadata\n    return userPage.map(UserResponse::fromEntity);\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "java-restful-best-practices",
+      "rule": "rest-status-codes",
+      "title": "Return correct HTTP status codes",
+      "impact": "HIGH",
+      "tags": [
+        "rest",
+        "api",
+        "java",
+        "spring-boot",
+        "http",
+        "status-codes"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "java",
+            "code": "// ❌ Always returning 200 OK, even for creations or errors\n@PostMapping\npublic UserResponse createUser(@RequestBody UserRequest request) {\n    User user = userService.create(request);\n    return UserResponse.fromEntity(user); // Default is 200 OK\n}\n\n@DeleteMapping(\"/{id}\")\npublic Map<String, String> deleteUser(@PathVariable Long id) {\n    boolean success = userService.delete(id);\n    if (!success) {\n        // ❌ Returning 200 OK for an error!\n        return Map.of(\"status\", \"error\", \"message\", \"User not found\"); \n    }\n    return Map.of(\"status\", \"success\"); // ❌ Should be 204 No Content\n}"
+          },
+          "correct": {
+            "lang": "java",
+            "code": "import org.springframework.http.HttpStatus;\nimport org.springframework.web.bind.annotation.ResponseStatus;\n\n// ...\n\n@PostMapping\n@ResponseStatus(HttpStatus.CREATED) // ✅ 201 Created\npublic UserResponse createUser(@RequestBody UserRequest request) {\n    User user = userService.create(request);\n    return UserResponse.fromEntity(user);\n}\n\n@DeleteMapping(\"/{id}\")\n@ResponseStatus(HttpStatus.NO_CONTENT) // ✅ 204 No Content\npublic void deleteUser(@PathVariable Long id) {\n    userService.delete(id); // If not found, it throws NotFoundException handled by @RestControllerAdvice\n}\n\n@PutMapping(\"/{id}\")\npublic UserResponse updateUser(@PathVariable Long id, @RequestBody UserRequest request) {\n    User user = userService.update(id, request);\n    return UserResponse.fromEntity(user); // ✅ 200 OK is correct for updates\n}"
+          }
+        }
+      ]
+    }
+  ]
+}

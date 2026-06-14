@@ -1,0 +1,10 @@
+{
+  "version": "1.0.0",
+  "organization": "Your Organization",
+  "date": "January 2026",
+  "abstract": "A concise description of this skill's scope and purpose. Should be 1-3 sentences explaining what domain is covered and what an AI agent gains by loading this skill.",
+  "references": [
+    "https://example.com/docs",
+    "https://example.com/guide"
+  ]
+}

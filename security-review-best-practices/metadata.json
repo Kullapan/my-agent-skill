@@ -1,0 +1,15 @@
+{
+  "version": "1.0.0",
+  "organization": "Security Engineering",
+  "date": "June 2026",
+  "abstract": "Comprehensive security review guide for web applications and APIs. Contains 35+ rules across 8 OWASP-aligned categories covering authentication, injection prevention, secrets management, API security, data protection, dependency hygiene, error handling, and infrastructure hardening. Each rule includes vulnerable vs. secure code examples to guide automated code review, generation, and security audits.",
+  "references": [
+    "https://owasp.org/www-project-top-ten/",
+    "https://owasp.org/www-project-api-security/",
+    "https://cheatsheetseries.owasp.org/",
+    "https://cwe.mitre.org/",
+    "https://nvd.nist.gov/",
+    "https://www.nist.gov/cyberframework",
+    "https://developer.mozilla.org/en-US/docs/Web/Security"
+  ]
+}

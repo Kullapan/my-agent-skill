@@ -1,0 +1,113 @@
+{
+  "generated": "2026-06-14T07:05:17.949Z",
+  "skill": "frontend-frameworks-best-practices",
+  "total": 4,
+  "testCases": [
+    {
+      "skill": "frontend-frameworks-best-practices",
+      "rule": "comp-pure-components",
+      "title": "Keep presentation components pure and stateless",
+      "impact": "CRITICAL",
+      "tags": [
+        "react",
+        "vue",
+        "components",
+        "pure",
+        "presentation",
+        "architecture"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "jsx",
+            "code": "// ❌ Presentation component fetches its own data and manages complex state\nfunction UserProfile({ userId }) {\n  const [user, setUser] = useState(null);\n\n  useEffect(() => {\n    fetch(`/api/users/${userId}`)\n      .then(res => res.json())\n      .then(data => setUser(data));\n  }, [userId]);\n\n  if (!user) return <LoadingSpinner />;\n\n  return (\n    <div className=\"p-4 border rounded\">\n      <h2 className=\"text-xl font-bold\">{user.name}</h2>\n      <button onClick={() => deleteUser(user.id)}>Delete</button>\n    </div>\n  );\n}"
+          },
+          "correct": {
+            "lang": "jsx",
+            "code": "// ✅ Presentation component: pure, testable, and reusable\nfunction UserProfileCard({ user, onDelete }) {\n  return (\n    <div className=\"p-4 border rounded\">\n      <h2 className=\"text-xl font-bold\">{user.name}</h2>\n      <button onClick={() => onDelete(user.id)}>Delete</button>\n    </div>\n  );\n}\n\n// ✅ Container component: handles data fetching and logic\nfunction UserProfileContainer({ userId }) {\n  // Use a data fetching library like React Query or SWR\n  const { data: user, isLoading } = useUser(userId);\n  const deleteMutation = useDeleteUser();\n\n  if (isLoading) return <LoadingSpinner />;\n\n  return (\n    <UserProfileCard \n      user={user} \n      onDelete={(id) => deleteMutation.mutate(id)} \n    />\n  );\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "frontend-frameworks-best-practices",
+      "rule": "css-tailwind-composition",
+      "title": "Use clsx and tailwind-merge to compose Tailwind classes cleanly",
+      "impact": "HIGH",
+      "tags": [
+        "tailwindcss",
+        "css",
+        "styling",
+        "react",
+        "vue",
+        "clsx",
+        "tailwind-merge"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "jsx",
+            "code": "// ❌ Hard to read, and custom `className` might not override base classes correctly\nfunction Button({ isPrimary, isDisabled, className }) {\n  const baseClasses = \"px-4 py-2 rounded font-bold \";\n  const primaryClasses = isPrimary ? \"bg-blue-500 text-white \" : \"bg-gray-200 text-black \";\n  const disabledClasses = isDisabled ? \"opacity-50 cursor-not-allowed \" : \"\";\n  \n  // If `className` contains `bg-red-500`, it might not override `bg-blue-500`!\n  return (\n    <button className={baseClasses + primaryClasses + disabledClasses + (className || \"\")}>\n      Click Me\n    </button>\n  );\n}"
+          },
+          "correct": {
+            "lang": "jsx",
+            "code": "// ✅ Create a reusable utility function (often called 'cn')\nimport { clsx } from \"clsx\";\nimport { twMerge } from \"tailwind-merge\";\n\nexport function cn(...inputs) {\n  return twMerge(clsx(inputs));\n}\n\n// ✅ Clean, conditional, and conflict-free class composition\nfunction Button({ isPrimary, isDisabled, className }) {\n  return (\n    <button \n      className={cn(\n        \"px-4 py-2 rounded font-bold\", // Base styles\n        isPrimary ? \"bg-blue-500 text-white\" : \"bg-gray-200 text-black\", // Variants\n        isDisabled && \"opacity-50 cursor-not-allowed\", // Conditional\n        className // User overrides (twMerge ensures `bg-red-500` will win here)\n      )}\n    >\n      Click Me\n    </button>\n  );\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "frontend-frameworks-best-practices",
+      "rule": "perf-memoize-renders",
+      "title": "Memoize expensive computations and components",
+      "impact": "MEDIUM",
+      "tags": [
+        "react",
+        "vue",
+        "performance",
+        "memo",
+        "usememo",
+        "usecallback",
+        "rendering"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "jsx",
+            "code": "// ❌ Filter runs on every single keystroke in the input!\nfunction SearchableList({ items }) {\n  const [query, setQuery] = useState(\"\");\n\n  // O(N) operation running on every render\n  const filteredItems = items.filter(item => item.name.includes(query));\n\n  return (\n    <div>\n      <input value={query} onChange={e => setQuery(e.target.value)} />\n      <ExpensiveList items={filteredItems} />\n    </div>\n  );\n}"
+          },
+          "correct": {
+            "lang": "jsx",
+            "code": "import { useState, useMemo, memo } from 'react';\n\n// ✅ Memoize the child component so it only re-renders if `items` changes\nconst ExpensiveList = memo(function ExpensiveList({ items }) {\n  // Complex rendering...\n});\n\nfunction SearchableList({ items }) {\n  const [query, setQuery] = useState(\"\");\n\n  // ✅ Only re-calculate when `items` or `query` changes\n  const filteredItems = useMemo(() => {\n    return items.filter(item => item.name.includes(query));\n  }, [items, query]);\n\n  return (\n    <div>\n      <input value={query} onChange={e => setQuery(e.target.value)} />\n      <ExpensiveList items={filteredItems} />\n    </div>\n  );\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "frontend-frameworks-best-practices",
+      "rule": "state-lift-state",
+      "title": "Lift state up or use global stores instead of prop drilling",
+      "impact": "HIGH",
+      "tags": [
+        "react",
+        "vue",
+        "state",
+        "props",
+        "prop-drilling",
+        "global-state"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "jsx",
+            "code": "// ❌ Intermediate components are polluted with props they don't need\nfunction App() {\n  const [theme, setTheme] = useState(\"dark\");\n  return <Layout theme={theme} setTheme={setTheme} />;\n}\n\nfunction Layout({ theme, setTheme }) {\n  // Layout doesn't care about theme, it just passes it down\n  return <Header theme={theme} setTheme={setTheme} />;\n}\n\nfunction Header({ theme, setTheme }) {\n  return <ThemeToggle theme={theme} setTheme={setTheme} />;\n}"
+          },
+          "correct": {
+            "lang": "jsx",
+            "code": "// ✅ Using a lightweight global store (e.g., Zustand for React)\nimport { create } from 'zustand';\n\nconst useThemeStore = create((set) => ({\n  theme: 'dark',\n  toggleTheme: () => set((state) => ({ theme: state.theme === 'dark' ? 'light' : 'dark' })),\n}));\n\nfunction App() {\n  return <Layout />;\n}\n\nfunction Layout() {\n  // Clean! No props passed down.\n  return <Header />;\n}\n\nfunction Header() {\n  return <ThemeToggle />;\n}\n\nfunction ThemeToggle() {\n  // ✅ Only the component that needs the state accesses it\n  const { theme, toggleTheme } = useThemeStore();\n  \n  return (\n    <button onClick={toggleTheme}>\n      Current theme: {theme}\n    </button>\n  );\n}"
+          }
+        }
+      ]
+    }
+  ]
+}

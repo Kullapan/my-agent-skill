@@ -1,0 +1,163 @@
+{
+  "generated": "2026-06-14T07:05:17.958Z",
+  "skill": "kotlin-webflux-best-practices",
+  "total": 6,
+  "testCases": [
+    {
+      "skill": "kotlin-webflux-best-practices",
+      "rule": "error-global-handling",
+      "title": "Handle exceptions globally using AbstractErrorWebExceptionHandler",
+      "impact": "HIGH",
+      "tags": [
+        "webflux",
+        "error-handling",
+        "reactive",
+        "global-exception-handler"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "kotlin",
+            "code": "// ❌ Try-catch block inside a functional handler leads to repetitive boilerplate\nsuspend fun getUser(request: ServerRequest): ServerResponse {\n    return try {\n        val user = userService.findById(request.pathVariable(\"id\"))\n        ServerResponse.ok().bodyValueAndAwait(user)\n    } catch (e: NotFoundException) {\n        ServerResponse.notFound().buildAndAwait()\n    } catch (e: Exception) {\n        ServerResponse.status(500).buildAndAwait()\n    }\n}"
+          },
+          "correct": {
+            "lang": "kotlin",
+            "code": "import org.springframework.boot.autoconfigure.web.WebProperties\nimport org.springframework.boot.autoconfigure.web.reactive.error.AbstractErrorWebExceptionHandler\nimport org.springframework.boot.web.reactive.error.ErrorAttributes\nimport org.springframework.context.ApplicationContext\nimport org.springframework.core.annotation.Order\nimport org.springframework.http.HttpStatus\nimport org.springframework.http.codec.ServerCodecConfigurer\nimport org.springframework.stereotype.Component\nimport org.springframework.web.reactive.function.server.*\n\n// ✅ Catches all errors globally across functional routes and filters\n@Component\n@Order(-2) // Give it priority over the DefaultErrorWebExceptionHandler\nclass GlobalErrorHandler(\n    errorAttributes: ErrorAttributes,\n    applicationContext: ApplicationContext,\n    serverCodecConfigurer: ServerCodecConfigurer\n) : AbstractErrorWebExceptionHandler(\n    errorAttributes,\n    WebProperties.Resources(),\n    applicationContext\n) {\n    init {\n        super.setMessageWriters(serverCodecConfigurer.writers)\n        super.setMessageReaders(serverCodecConfigurer.readers)\n    }\n\n    override fun getRoutingFunction(errorAttributes: ErrorAttributes): RouterFunction<ServerResponse> {\n        return coRouter {\n            all { request -> renderErrorResponse(request) }\n        }\n    }\n\n    private suspend fun renderErrorResponse(request: ServerRequest): ServerResponse {\n        val error = getError(request)\n        \n        val status = when (error) {\n            is NotFoundException -> HttpStatus.NOT_FOUND\n            is IllegalArgumentException -> HttpStatus.BAD_REQUEST\n            else -> HttpStatus.INTERNAL_SERVER_ERROR\n        }\n\n        return ServerResponse.status(status)\n            .bodyValueAndAwait(mapOf(\"error\" to error.message))\n    }\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "kotlin-webflux-best-practices",
+      "rule": "reactive-blocking-io",
+      "title": "Isolate blocking I/O calls to Dispatchers.IO",
+      "impact": "CRITICAL",
+      "tags": [
+        "webflux",
+        "non-blocking",
+        "coroutines",
+        "blocking",
+        "dispatchers",
+        "thread-pool"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "kotlin",
+            "code": "// ❌ Blocking call on the main WebFlux thread!\nsuspend fun getUserProfile(id: String): Profile {\n    // RestTemplate is synchronous and blocking.\n    // This blocks the Netty thread, freezing other requests!\n    val response = restTemplate.getForObject(\"http://legacy-api/users/$id\", Profile::class.java)\n    return response!!\n}"
+          },
+          "correct": {
+            "lang": "kotlin",
+            "code": "import kotlinx.coroutines.Dispatchers\nimport kotlinx.coroutines.withContext\n\n// ✅ Use WebClient (non-blocking) whenever possible\nsuspend fun getUserProfile(id: String): Profile {\n    return webClient.get()\n        .uri(\"http://legacy-api/users/$id\")\n        .retrieve()\n        .awaitBody()\n}\n\n// ✅ If you MUST use a blocking library (e.g., JDBC), offload to Dispatchers.IO\nsuspend fun getUserProfileLegacyDb(id: String): Profile {\n    return withContext(Dispatchers.IO) {\n        // This runs on a separate thread pool designed for blocking tasks,\n        // leaving the Netty event loop free to handle other requests.\n        jdbcRepository.findProfileBlocking(id)\n    }\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "kotlin-webflux-best-practices",
+      "rule": "reactive-context",
+      "title": "Propagate context correctly across coroutine boundaries using ReactorContext",
+      "impact": "HIGH",
+      "tags": [
+        "context",
+        "reactive",
+        "coroutines",
+        "webflux",
+        "mdc",
+        "security",
+        "tracing"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "kotlin",
+            "code": "// ❌ Relying on ThreadLocal in a reactive app\nval userId = RequestContextHolder.currentRequestAttributes().getAttribute(\"userId\")\n\n// ❌ Calling a suspend function from a Flux without propagating context\n@GetMapping(\"/items\")\nfun getItems(): Flux<Item> {\n    return itemRepository.findAll()\n        .flatMap { item ->\n            // Context is lost when bridging Mono -> suspend -> Mono!\n            mono { enrichItem(item) } \n        }\n}"
+          },
+          "correct": {
+            "lang": "kotlin",
+            "code": "import kotlinx.coroutines.reactor.ReactorContext\nimport kotlinx.coroutines.reactor.mono\nimport kotlinx.coroutines.withContext\n\n// ✅ Reading Reactor context from a Coroutine\nsuspend fun getCurrentUser(): String {\n    // Access the Reactor context from the CoroutineContext\n    val reactorContext = currentCoroutineContext()[ReactorContext]?.context\n        ?: throw IllegalStateException(\"No context found\")\n    return reactorContext.get<String>(\"userId\")\n}\n\n// ✅ Explicitly capturing and propagating when bridging Flux -> Coroutine\n@GetMapping(\"/items\")\nfun getItems(): Flux<Item> {\n    return itemRepository.findAll()\n        .flatMap { item ->\n            mono {\n                // The mono {} builder from kotlinx-coroutines-reactor \n                // automatically bridges the Reactor context to CoroutineContext!\n                enrichItem(item) \n            }\n        }\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "kotlin-webflux-best-practices",
+      "rule": "reactive-coroutines",
+      "title": "Use Kotlin Coroutines over raw Reactor types (Mono/Flux)",
+      "impact": "HIGH",
+      "tags": [
+        "kotlin",
+        "coroutines",
+        "webflux",
+        "reactor",
+        "mono",
+        "flux",
+        "suspend",
+        "flow"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "kotlin",
+            "code": "// ❌ Hard to read, susceptible to callback hell and nested flatMaps\n@GetMapping(\"/users/{id}\")\nfun getUserData(@PathVariable id: String): Mono<UserResponse> {\n    return userRepository.findById(id)\n        .switchIfEmpty(Mono.error(NotFoundException(\"User not found\")))\n        .flatMap { user ->\n            preferenceRepository.findByUserId(user.id)\n                .map { prefs -> UserResponse(user, prefs) }\n        }\n}"
+          },
+          "correct": {
+            "lang": "kotlin",
+            "code": "// ✅ Linear, imperative flow using Coroutines\n@GetMapping(\"/users/{id}\")\nsuspend fun getUserData(@PathVariable id: String): UserResponse {\n    // Await non-blocking calls naturally\n    val user = userRepository.findById(id) ?: throw NotFoundException(\"User not found\")\n    val prefs = preferenceRepository.findByUserId(user.id)\n    \n    return UserResponse(user, prefs)\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "kotlin-webflux-best-practices",
+      "rule": "routing-functional",
+      "title": "Prefer functional routing over annotations",
+      "impact": "MEDIUM",
+      "tags": [
+        "kotlin",
+        "webflux",
+        "routing",
+        "functional",
+        "dsl"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "kotlin",
+            "code": "// ❌ Traditional reflection-based routing\n@RestController\n@RequestMapping(\"/api/users\")\nclass UserController(private val userService: UserService) {\n\n    @GetMapping(\"/{id}\")\n    suspend fun getUser(@PathVariable id: String): User {\n        return userService.findById(id)\n    }\n}"
+          },
+          "correct": {
+            "lang": "kotlin",
+            "code": "import org.springframework.context.annotation.Bean\nimport org.springframework.context.annotation.Configuration\nimport org.springframework.web.reactive.function.server.coRouter\n\n// ✅ Declarative, composable functional routing\n@Configuration\nclass UserRouterConfiguration {\n\n    @Bean\n    fun userRoutes(userHandler: UserHandler) = coRouter {\n        \"/api/users\".nest {\n            GET(\"/{id}\", userHandler::getUser)\n            POST(\"/\", userHandler::createUser)\n        }\n    }\n}\n\n// Handlers are plain Spring components with suspend functions\n@Component\nclass UserHandler(private val userService: UserService) {\n\n    suspend fun getUser(request: ServerRequest): ServerResponse {\n        val id = request.pathVariable(\"id\")\n        val user = userService.findById(id)\n        return ServerResponse.ok().bodyValueAndAwait(user)\n    }\n}"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "kotlin-webflux-best-practices",
+      "rule": "test-stepverifier",
+      "title": "Use StepVerifier and runTest for testing reactive streams",
+      "impact": "MEDIUM",
+      "tags": [
+        "testing",
+        "reactive",
+        "webflux",
+        "stepverifier",
+        "coroutines",
+        "runTest"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "kotlin",
+            "code": "// ❌ Test might pass because it doesn't wait for the Mono to emit\n@Test\nfun `test get user`() {\n    val result = userService.findById(\"123\")\n    // If it's a Mono, this assertion is just checking the Mono object, not its contents!\n    assertNotNull(result) \n}\n\n// ❌ Using runBlocking for coroutines can be slow due to real delays\n@Test\nfun `test with delay`() = runBlocking {\n    val result = service.doWorkWithDelay() // Actually waits 5 seconds\n    assertEquals(\"Done\", result)\n}"
+          },
+          "correct": {
+            "lang": "kotlin",
+            "code": "import kotlinx.coroutines.test.runTest\nimport reactor.test.StepVerifier\n\n// ✅ For raw Mono/Flux (if interfacing with Java libraries)\n@Test\nfun `test Mono emission`() {\n    val publisher = userService.findByIdReactive(\"123\")\n    \n    StepVerifier.create(publisher)\n        .expectNextMatches { user -> user.name == \"Alice\" }\n        .verifyComplete()\n}\n\n// ✅ For Coroutines (suspend functions)\n@Test\nfun `test suspend function`() = runTest {\n    // Virtual time: delays are skipped instantly!\n    val result = userService.findByIdSuspend(\"123\") \n    assertEquals(\"Alice\", result.name)\n}"
+          }
+        }
+      ]
+    }
+  ]
+}

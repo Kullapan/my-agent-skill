@@ -1,0 +1,114 @@
+{
+  "generated": "2026-06-14T07:05:17.962Z",
+  "skill": "openshift-docker-best-practices",
+  "total": 4,
+  "testCases": [
+    {
+      "skill": "openshift-docker-best-practices",
+      "rule": "docker-multi-stage",
+      "title": "Use multi-stage builds to optimize image size and security",
+      "impact": "HIGH",
+      "tags": [
+        "docker",
+        "multi-stage",
+        "build",
+        "optimization",
+        "security",
+        "image-size"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "dockerfile",
+            "code": "# ❌ Pulls the heavy JDK, copies all source code, builds, and runs in the same image\nFROM maven:3.9-eclipse-temurin-17\nWORKDIR /app\nCOPY . .\nRUN mvn clean package -DskipTests\n\n# 🚨 The final image contains the JDK, Maven, and all original source code!\nCMD [\"java\", \"-jar\", \"target/myapp.jar\"]"
+          },
+          "correct": {
+            "lang": "dockerfile",
+            "code": "# ✅ Stage 1: Build Environment (heavy, contains tools)\nFROM maven:3.9-eclipse-temurin-17 AS builder\nWORKDIR /app\nCOPY pom.xml .\n# Cache dependencies\nRUN mvn dependency:go-offline\nCOPY src ./src\nRUN mvn clean package -DskipTests\n\n# ✅ Stage 2: Minimal Production Runtime (JRE only, no source code)\nFROM eclipse-temurin:17-jre-alpine\nWORKDIR /app\n\n# Copy ONLY the compiled artifact from the builder stage\nCOPY --from=builder /app/target/myapp.jar ./myapp.jar\n\n# Apply OpenShift SCC permissions\nRUN chgrp -R 0 /app && chmod -R g=u /app\nUSER 1001\n\nCMD [\"java\", \"-jar\", \"myapp.jar\"]"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "openshift-docker-best-practices",
+      "rule": "k8s-probes",
+      "title": "Implement both liveness and readiness probes",
+      "impact": "HIGH",
+      "tags": [
+        "kubernetes",
+        "openshift",
+        "probes",
+        "liveness",
+        "readiness",
+        "health-checks"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "yaml",
+            "code": "# ❌ Deployment without health checks\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: myapp\nspec:\n  template:\n    spec:\n      containers:\n      - name: myapp\n        image: myorg/myapp:1.0.0\n        ports:\n        - containerPort: 8080\n        # 🚨 OpenShift will blindly send traffic and will never restart deadlocked pods"
+          },
+          "correct": {
+            "lang": "yaml",
+            "code": "# ✅ Deployment with robust health checks\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: myapp\nspec:\n  template:\n    spec:\n      containers:\n      - name: myapp\n        image: myorg/myapp:1.0.0\n        ports:\n        - containerPort: 8080\n        \n        # ✅ Liveness: \"Am I deadlocked?\" (Restart if this fails)\n        livenessProbe:\n          httpGet:\n            path: /health/liveness\n            port: 8080\n          initialDelaySeconds: 30\n          periodSeconds: 10\n          failureThreshold: 3\n          \n        # ✅ Readiness: \"Am I ready for traffic?\" (Remove from load balancer if this fails)\n        readinessProbe:\n          httpGet:\n            path: /health/readiness\n            port: 8080\n          initialDelaySeconds: 5\n          periodSeconds: 5\n          successThreshold: 1\n          failureThreshold: 3"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "openshift-docker-best-practices",
+      "rule": "k8s-resource-limits",
+      "title": "Always define CPU and memory requests and limits",
+      "impact": "HIGH",
+      "tags": [
+        "kubernetes",
+        "openshift",
+        "resources",
+        "limits",
+        "requests",
+        "oom",
+        "cpu",
+        "memory"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "yaml",
+            "code": "# ❌ Unlimited resource consumption allowed\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: myapp\nspec:\n  template:\n    spec:\n      containers:\n      - name: myapp\n        image: myorg/myapp:1.0.0\n        # 🚨 Missing resources block!"
+          },
+          "correct": {
+            "lang": "yaml",
+            "code": "# ✅ Resources explicitly defined\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: myapp\nspec:\n  template:\n    spec:\n      containers:\n      - name: myapp\n        image: myorg/myapp:1.0.0\n        resources:\n          # ✅ Guaranteed resources for scheduling\n          requests:\n            cpu: \"100m\"      # 1/10th of a CPU core\n            memory: \"256Mi\"  # 256 Megabytes\n          # ✅ Hard cap (will be OOMKilled if it exceeds memory limit)\n          limits:\n            cpu: \"500m\"      # Half a CPU core\n            memory: \"512Mi\"  # 512 Megabytes"
+          }
+        }
+      ]
+    },
+    {
+      "skill": "openshift-docker-best-practices",
+      "rule": "scc-non-root",
+      "title": "Ensure containers run without root privileges (OpenShift SCC)",
+      "impact": "CRITICAL",
+      "tags": [
+        "openshift",
+        "docker",
+        "scc",
+        "security",
+        "root",
+        "permissions",
+        "uid"
+      ],
+      "pairs": [
+        {
+          "incorrect": {
+            "lang": "dockerfile",
+            "code": "# ❌ Runs as root by default\nFROM node:22-alpine\nWORKDIR /app\nCOPY . .\nRUN npm install\n\n# ❌ Tries to bind to a privileged port (requires root)\nENV PORT=80 \nEXPOSE 80\n\nCMD [\"node\", \"server.js\"]\n# Will fail in OpenShift: \"listen EACCES: permission denied 0.0.0.0:80\""
+          },
+          "correct": {
+            "lang": "dockerfile",
+            "code": "FROM node:22-alpine\nWORKDIR /app\n\nCOPY package*.json ./\nRUN npm ci --omit=dev\nCOPY . .\n\n# ✅ Bind to an unprivileged port\nENV PORT=8080\nEXPOSE 8080\n\n# ✅ OpenShift assigns a random UID, but always uses GID 0 (root group).\n# We must ensure GID 0 can read and write necessary directories.\nRUN chgrp -R 0 /app && \\\n    chmod -R g=u /app\n\n# ✅ Explicitly set a non-root user (good practice, though OpenShift will override the UID)\nUSER 1001\n\nCMD [\"node\", \"server.js\"]"
+          }
+        }
+      ]
+    }
+  ]
+}
